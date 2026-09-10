@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Warehouse Bot Fleet — Collision Negotiation (A*, connected aisles)</title>
+<style>
+  :root{
+    --bg:#1b1d22; --panel:#22252b; --panel2:#2a2e36; --text:#e8eaf0; --muted:#9aa1b0;
+    --accent:#f4c542; --line:#3a3f4a;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:'Segoe UI',Roboto,Arial,sans-serif; background:var(--bg); color:var(--text);
+    display:flex; flex-direction:column; height:100vh; overflow:hidden;
+  }
+  header{
+    padding:10px 18px; background:var(--panel); border-bottom:1px solid var(--line);
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+  }
+  header h1{font-size:16px; margin:0; font-weight:600; margin-right:auto;}
+  .hint{font-size:12px; color:var(--muted); width:100%; padding:0 18px 8px; background:var(--panel); margin-top:-4px;}
+  .ctrl{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted);}
+  button{
+    background:var(--panel2); color:var(--text); border:1px solid var(--line); padding:7px 14px;
+    border-radius:6px; cursor:pointer; font-size:13px; transition:background .15s;
+  }
+  button:hover{background:#343945;}
+  button.active{background:#8a5c1e; border-color:#c98a2e; color:#ffe6b3;}
+  button.danger{background:#6f3f3f; border-color:#8a4d4d;}
+  input[type=range]{accent-color:var(--accent);}
+  .main{flex:1; display:flex; min-height:0;}
+  .map-wrap{flex:1; position:relative; overflow:auto; background:#17181c; display:flex; align-items:center; justify-content:center;}
+  svg#map{width:100%; height:100%; max-width:1600px;}
+  .sidebar{width:370px; background:var(--panel); border-left:1px solid var(--line); display:flex; flex-direction:column; min-height:0;}
+  .bots-list{padding:10px; overflow-y:auto; flex:0 0 auto; max-height:58%;}
+  .bot-card{
+    background:var(--panel2); border:1px solid var(--line); border-left:5px solid var(--c);
+    border-radius:8px; padding:9px 11px; margin-bottom:8px; font-size:12.5px; cursor:pointer;
+  }
+  .bot-card.selected{outline:2px solid #fff176;}
+  .bot-card .row1{display:flex; justify-content:space-between; align-items:center; font-weight:600; margin-bottom:5px;}
+  .bot-card .status{font-size:10.5px; padding:1px 7px; border-radius:10px; background:#3a3f4a; color:var(--muted); white-space:nowrap;}
+  .bot-card .status.moving{background:#2c5b3f; color:#a9e6bf;}
+  .bot-card .status.waiting{background:#7a5b1e; color:#ffd98a;}
+  .bot-card .status.blocked{background:#6f3f3f; color:#ffb3b3;}
+  .bot-card .status.arrived{background:#2c3f5b; color:#a9c9e6;}
+  .bot-card .status.sidestep{background:#5b2c4f; color:#f0a9df;}
+  .bot-card .status.selected{background:#5c5220; color:#fff176;}
+  .bot-card .status.paused{background:#3a4652; color:#9fd3f0;}
+  .bot-card .run-btn{
+    width:100%; margin-top:7px; padding:6px 0; font-size:12.5px; font-weight:600;
+    background:#2c5b3f; border-color:#3f8a5e; color:#c8f5d8;
+  }
+  .bot-card .run-btn:hover{background:#357049;}
+  .bot-card .run-btn.pause-mode{background:#7a5b1e; border-color:#c98a2e; color:#ffe6b3;}
+  .bot-card .run-btn.pause-mode:hover{background:#93701f;}
+  .bot-card .run-btn:disabled{background:#2a2e36; border-color:var(--line); color:var(--muted); cursor:default;}
+  .bot-card .meta{display:flex; justify-content:space-between; color:var(--muted); font-size:11.5px; margin-top:3px;}
+  .bot-card .tag{font-size:11px; color:#dfe3ea; margin-top:4px; background:#161820; padding:3px 7px; border-radius:5px; display:inline-block;}
+  .bot-card .tag.note{background:#3a1a1a; color:#ffb3b3; display:block; margin-top:5px;}
+  .batt-bar{height:6px; border-radius:3px; background:#161820; margin-top:6px; overflow:hidden;}
+  .batt-fill{height:100%; border-radius:3px; transition:width .3s;}
+  .log-panel{flex:1; border-top:1px solid var(--line); padding:10px; overflow-y:auto; font-size:11.5px; min-height:0;}
+  .log-panel h3{margin:0 0 8px; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.5px;}
+  .log-entry{padding:4px 6px; border-radius:4px; margin-bottom:4px; line-height:1.35;}
+  .log-entry.info{background:#20242c;}
+  .log-entry.warn{background:#3a2f1a; color:#ffd98a;}
+  .log-entry.conflict{background:#3a1a1a; color:#ff9a9a;}
+  .log-entry.reroute{background:#2a1a3a; color:#dba9ff;}
+  .log-entry.arrive{background:#1a3a24; color:#9affc0;}
+  .legend{display:flex; gap:14px; font-size:11px; color:var(--muted); align-items:center; flex-wrap:wrap;}
+  .legend span{display:inline-flex; align-items:center; gap:4px;}
+  .dot{width:10px; height:10px; border-radius:50%; display:inline-block;}
+  #tickLbl{min-width:52px; display:inline-block; text-align:right;}
+  .bot-g{cursor:pointer;}
+  .hit{fill:transparent; cursor:pointer;}
+  .hit:hover{fill:rgba(255,255,255,0.15);}
+  .path-line{fill:none; stroke-linecap:round; stroke-linejoin:round; opacity:.9; pointer-events:none;}
+  .path-line.flash{animation:flashPath 1s ease-out;}
+  @keyframes flashPath{ 0%{stroke-width:16; opacity:1;} 100%{stroke-width:7; opacity:.9;} }
+  .conflict-ring{animation:conflictPulse .8s ease-out forwards;}
+  @keyframes conflictPulse{ 0%{r:20; opacity:1;} 100%{r:48; opacity:0;} }
+  .bot-tag-label{font-size:15px; fill:#fff; font-weight:700; text-anchor:middle; paint-order:stroke; stroke:#000; stroke-width:3px;}
+  .sidestep-marker{fill:none; stroke-dasharray:4,3;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🏭 Warehouse Bot Fleet — A* Collision Negotiation</h1>
+  <div class="ctrl"><button id="btnObstacle">🚧 Place Obstacle</button></div>
+  <div class="ctrl"><button id="btnClearObstacles">✖ Clear Obstacles</button></div>
+  <div class="ctrl"><button id="btnPlayPauseAll">▶ Play All</button></div>
+  <div class="ctrl"><button id="btnReset" class="danger">⟲ Reset</button></div>
+  <div class="ctrl">Move speed <input type="range" id="speed" min="150" max="1400" value="500" step="50"><span id="tickLbl">500ms</span></div>
+  <div class="legend">
+    <span><span class="dot" style="background:#2f6fed"></span>Bot A (priority 1)</span>
+    <span><span class="dot" style="background:#e63946"></span>Bot B (priority 2)</span>
+    <span><span class="dot" style="background:#2ecc71"></span>Bot C (priority 3)</span>
+    <span><span class="dot" style="background:#4b2170"></span>Bot D (priority 4)</span>
+  </div>
+</header>
+<div class="hint" id="hintBar">Click a bot, then click any node as its destination — the path is A*-computed and highlighted right away, but the bot <b>won't move</b> until you press its <b>▶ Play</b> button in the sidebar, or the <b>▶ Play All</b> button in the header to start every commanded bot at once. Press ⏸ Pause (per bot or all) at any time to freeze mid-route, then Resume to continue. All running bots move <b>concurrently</b> every tick and negotiate collisions by priority — a paused bot still counts as an obstacle for other bots' A* routing. Obstacles are checked in real time: placing one on any bot's route — even a highlighted-but-not-yet-started one, or one it's mid-way through — triggers an immediate reroute, and the affected bot posts a 🚧 note in its own card plus the shared log so the rest of the fleet effectively "knows" about the new blockage. When a collision (bot or obstacle) is flagged, the lower-priority bot automatically replans a brand-new A* route around it — no manual input needed; it only falls back to a one-node sidestep-and-return if literally no alternate route exists. Priority is fixed A&gt;B&gt;C&gt;D with aging so no one waits forever.</div>
+
+<div class="main">
+  <div class="map-wrap">
+    <svg id="map" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg"></svg>
+  </div>
+  <div class="sidebar">
+    <div class="bots-list" id="botsList"></div>
+    <div class="log-panel">
+      <h3>Event Log</h3>
+      <div id="logBox"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================== LAYOUT ============================== */
+const COLS = [93,215,478,600,793,890,1067,1155,1362,1487,1641,1750];
+const ROWS = [68,213,353,494,637,778];
+const SPAWN_COLS = [3,5,7,9];
+const SPAWN_Y = 968;
+const SHELF_PAIRS = [[1,2],[3,4],[5,6],[7,8],[9,10]];
+const LAST_ROW = ROWS.length-1; // 5
+const LAST_COL = COLS.length-1; // 11
+
+/* ============================== AISLE GROUPS ============================== */
+// Columns are grouped into "aisle clusters" (columns not separated by a shelf).
+// Within a cluster, adjacent columns get: (a) a rung edge at every row, and
+// (b) diagonal shortcut edges at the very top (row0-row1) and bottom (last-1,last) rows.
+const shelfEdgeSet = new Set(SHELF_PAIRS.map(([a,b])=>`${a}-${b}`));
+const aisleGroups = [];
+{
+  let current = [0];
+  for(let c=1;c<COLS.length;c++){
+    if(shelfEdgeSet.has(`${c-1}-${c}`)){ aisleGroups.push(current); current=[c]; }
+    else current.push(c);
+  }
+  aisleGroups.push(current);
+}
+const aislePairs = []; // adjacent column pairs within each group
+aisleGroups.forEach(g=>{ for(let i=0;i<g.length-1;i++) aislePairs.push([g[i],g[i+1]]); });
+
+/* ============================== GRAPH BUILD ============================== */
+const nodes = {}; const adj = {};
+function addNode(id,x,y){ nodes[id]={x,y}; adj[id]=[]; }
+function addEdge(a,b){
+  const dx=nodes[a].x-nodes[b].x, dy=nodes[a].y-nodes[b].y;
+  const d=Math.sqrt(dx*dx+dy*dy);
+  adj[a].push({to:b,dist:d}); adj[b].push({to:a,dist:d});
+}
+for(let r=0;r<ROWS.length;r++) for(let c=0;c<COLS.length;c++) addNode(`${r}-${c}`,COLS[c],ROWS[r]);
+
+// full-height vertical travel within every column
+for(let r=0;r<LAST_ROW;r++) for(let c=0;c<COLS.length;c++) addEdge(`${r}-${c}`,`${r+1}-${c}`);
+
+// top & bottom rows remain one continuous corridor across every column
+for(const r of [0,LAST_ROW]) for(let c=0;c<LAST_COL;c++) addEdge(`${r}-${c}`,`${r}-${c+1}`);
+
+// rung connections within each aisle-pair, at EVERY row (this is the new shortcut —
+// a bot no longer has to travel to the end of the aisle to cross over)
+for(const [ca,cb] of aislePairs){
+  for(let r=1;r<LAST_ROW;r++){ // rows 0 and LAST_ROW already connected by the top/bottom corridor above
+    addEdge(`${r}-${ca}`,`${r}-${cb}`);
+  }
+  // diagonal shortcuts (the "X") at the very top and very bottom 2x2 blocks
+  addEdge(`0-${ca}`,`1-${cb}`);
+  addEdge(`0-${cb}`,`1-${ca}`);
+  addEdge(`${LAST_ROW-1}-${ca}`,`${LAST_ROW}-${cb}`);
+  addEdge(`${LAST_ROW-1}-${cb}`,`${LAST_ROW}-${ca}`);
+}
+
+// spawn nodes below the bottom row
+for(const sc of SPAWN_COLS){ addNode(`S-${sc}`,COLS[sc],SPAWN_Y); addEdge(`${LAST_ROW}-${sc}`,`S-${sc}`); }
+for(let i=0;i<SPAWN_COLS.length-1;i++) addEdge(`S-${SPAWN_COLS[i]}`,`S-${SPAWN_COLS[i+1]}`);
+
+/* ============================== APRILTAG ADDRESSING ============================== */
+const tagOf = {};
+{ let n=0; for(const id in nodes){ tagOf[id]='AT-' + String(n++).padStart(3,'0'); } }
+function locLabel(nodeId){ return `${tagOf[nodeId]} (node ${nodeId})`; }
+
+/* ============================== A* PATHFINDING ============================== */
+function heuristic(a,b){
+  const dx=nodes[a].x-nodes[b].x, dy=nodes[a].y-nodes[b].y;
+  return Math.sqrt(dx*dx+dy*dy); // straight-line distance — admissible since it never overestimates true path cost
+}
+function aStar(start,end,blocked){
+  blocked = blocked || new Set();
+  const gScore={}, fScore={}, prev={}, closed=new Set();
+  for(const id in nodes){ gScore[id]=Infinity; fScore[id]=Infinity; }
+  gScore[start]=0; fScore[start]=heuristic(start,end);
+  const open=[[fScore[start],start]];
+  while(open.length){
+    open.sort((a,b)=>a[0]-b[0]); // simple sorted array as the open set / priority queue
+    const [,u]=open.shift();
+    if(closed.has(u)) continue;
+    closed.add(u);
+    if(u===end) break;
+    for(const e of adj[u]){
+      if(blocked.has(e.to) && e.to!==end) continue;
+      const tentative=gScore[u]+e.dist;
+      if(tentative<gScore[e.to]){
+        prev[e.to]=u;
+        gScore[e.to]=tentative;
+        fScore[e.to]=tentative+heuristic(e.to,end);
+        open.push([fScore[e.to],e.to]);
+      }
+    }
+  }
+  if(gScore[end]===Infinity) return null;
+  const path=[end]; let cur=end;
+  while(cur!==start){ cur=prev[cur]; path.unshift(cur); }
+  return path;
+}
+
+/* ============================== SVG DRAWING ============================== */
+const svgNS="http://www.w3.org/2000/svg";
+const svg=document.getElementById('map');
+function el(tag,attrs){ const e=document.createElementNS(svgNS,tag); for(const k in attrs) e.setAttribute(k,attrs[k]); return e; }
+
+const MAP_BG='#17181c', LINE_COLOR='#3ab6cf', SHELF_FILL='#f2b632', SHELF_TEXT='#1c1c20';
+
+svg.appendChild(el('rect',{x:0,y:0,width:1920,height:1080,fill:MAP_BG}));
+
+const linesLayer = el('g',{}); svg.appendChild(linesLayer);
+// full-height verticals per column
+for(let c=0;c<COLS.length;c++) linesLayer.appendChild(el('line',{x1:COLS[c],y1:ROWS[0],x2:COLS[c],y2:ROWS[LAST_ROW],stroke:LINE_COLOR,'stroke-width':10}));
+// top/bottom full corridor
+for(const r of [0,LAST_ROW]) linesLayer.appendChild(el('line',{x1:COLS[0],y1:ROWS[r],x2:COLS[LAST_COL],y2:ROWS[r],stroke:LINE_COLOR,'stroke-width':10}));
+// spawn stems
+for(const sc of SPAWN_COLS) linesLayer.appendChild(el('line',{x1:COLS[sc],y1:ROWS[LAST_ROW],x2:COLS[sc],y2:SPAWN_Y,stroke:LINE_COLOR,'stroke-width':10}));
+linesLayer.appendChild(el('line',{x1:COLS[SPAWN_COLS[0]],y1:SPAWN_Y,x2:COLS[SPAWN_COLS[SPAWN_COLS.length-1]],y2:SPAWN_Y,stroke:LINE_COLOR,'stroke-width':10}));
+// rung lines at every middle row within each aisle pair
+for(const [ca,cb] of aislePairs){
+  for(let r=1;r<LAST_ROW;r++){
+    linesLayer.appendChild(el('line',{x1:COLS[ca],y1:ROWS[r],x2:COLS[cb],y2:ROWS[r],stroke:LINE_COLOR,'stroke-width':8}));
+  }
+  // diagonal X at the top block
+  linesLayer.appendChild(el('line',{x1:COLS[ca],y1:ROWS[0],x2:COLS[cb],y2:ROWS[1],stroke:LINE_COLOR,'stroke-width':7}));
+  linesLayer.appendChild(el('line',{x1:COLS[cb],y1:ROWS[0],x2:COLS[ca],y2:ROWS[1],stroke:LINE_COLOR,'stroke-width':7}));
+  // diagonal X at the bottom block
+  linesLayer.appendChild(el('line',{x1:COLS[ca],y1:ROWS[LAST_ROW-1],x2:COLS[cb],y2:ROWS[LAST_ROW],stroke:LINE_COLOR,'stroke-width':7}));
+  linesLayer.appendChild(el('line',{x1:COLS[cb],y1:ROWS[LAST_ROW-1],x2:COLS[ca],y2:ROWS[LAST_ROW],stroke:LINE_COLOR,'stroke-width':7}));
+}
+
+for(const [ci,cj] of SHELF_PAIRS){
+  const x1=COLS[ci], x2=COLS[cj];
+  const cx=(x1+x2)/2, w=Math.min(120,x2-x1-40);
+  const yTop=ROWS[1]-63, yBot=ROWS[LAST_ROW-1]+63;
+  const g=el('g',{});
+  g.appendChild(el('rect',{x:cx-w/2,y:yTop,width:w,height:yBot-yTop,rx:60,ry:60,fill:SHELF_FILL}));
+  const t=el('text',{x:cx,y:(yTop+yBot)/2,fill:SHELF_TEXT,'font-size':26,'text-anchor':'middle',
+    transform:`rotate(90 ${cx} ${(yTop+yBot)/2})`, 'font-family':'Segoe UI,Arial'});
+  t.textContent='shelf'; g.appendChild(t);
+  svg.appendChild(g);
+}
+
+const pathLayer = el('g',{}); svg.appendChild(pathLayer);
+
+function seededRand(seed){ let x=Math.sin(seed*999)*10000; return x-Math.floor(x); }
+function drawMarker(x,y,seed){
+  const g=el('g',{transform:`translate(${x-26},${y-26})`});
+  g.appendChild(el('rect',{x:0,y:0,width:52,height:52,fill:'#111'}));
+  g.appendChild(el('rect',{x:5,y:5,width:42,height:42,fill:'#fff'}));
+  const cell=42/5;
+  for(let i=0;i<5;i++) for(let j=0;j<5;j++){
+    if(seededRand(seed*31+i*7+j*13)>0.5) g.appendChild(el('rect',{x:5+j*cell,y:5+i*cell,width:cell,height:cell,fill:'#111'}));
+  }
+  svg.appendChild(g);
+}
+let mi=0;
+for(const id in nodes){ drawMarker(nodes[id].x,nodes[id].y,mi++); }
+
+const obstacleLayer = el('g',{'pointer-events':'none'}); svg.appendChild(obstacleLayer);
+const obstacleIcons = {};
+function drawObstacleIcon(id){
+  const p=nodes[id];
+  const g=el('g',{transform:`translate(${p.x},${p.y})`});
+  g.appendChild(el('circle',{r:22,fill:'#1a1a1a',stroke:'#ff3b3b','stroke-width':4}));
+  const t=el('text',{x:0,y:8,'text-anchor':'middle','font-size':26,fill:'#ff3b3b','font-weight':'900'});
+  t.textContent='✕'; g.appendChild(t);
+  obstacleLayer.appendChild(g);
+  obstacleIcons[id]=g;
+}
+function removeObstacleIcon(id){ if(obstacleIcons[id]){ obstacleIcons[id].remove(); delete obstacleIcons[id]; } }
+
+const conflictLayer = el('g',{'pointer-events':'none'}); svg.appendChild(conflictLayer);
+function flashConflict(nodeId){
+  const p=nodes[nodeId];
+  const c=el('circle',{cx:p.x,cy:p.y,r:20,fill:'none',stroke:'#ff2e2e','stroke-width':6,class:'conflict-ring'});
+  conflictLayer.appendChild(c);
+  setTimeout(()=>c.remove(),800);
+  const warn=el('text',{x:p.x,y:p.y-40,'text-anchor':'middle','font-size':30});
+  warn.textContent='⚠️'; warn.setAttribute('class','conflict-ring');
+  conflictLayer.appendChild(warn);
+  setTimeout(()=>warn.remove(),800);
+}
+
+const hitLayer = el('g',{}); svg.appendChild(hitLayer);
+for(const id in nodes){
+  const p=nodes[id];
+  const c=el('circle',{cx:p.x,cy:p.y,r:34,class:'hit','data-id':id});
+  const title=el('title',{}); title.textContent = `AprilTag ${locLabel(id)}`;
+  c.appendChild(title);
+  c.addEventListener('click',()=>onNodeClick(id));
+  hitLayer.appendChild(c);
+}
+
+/* ============================== BOTS ============================== */
+const BOT_DEFS = [
+  {id:'A',color:'#2f6fed',start:`S-3`,basePriority:0},
+  {id:'B',color:'#e63946',start:`S-5`,basePriority:1},
+  {id:'C',color:'#2ecc71',start:`S-7`,basePriority:2},
+  {id:'D',color:'#4b2170',start:`S-9`,basePriority:3},
+];
+let bots=[];
+const botLayer = el('g',{}); svg.appendChild(botLayer);
+let selectedBotId=null;
+let obstacleMode=false;
+let obstacles=new Set();
+let tickMs=500;
+let simTimer=null;
+
+function makeBotVisual(bot){
+  const g=el('g',{class:'bot-g'});
+  g.style.transition='transform .45s linear';
+  const ring=el('circle',{r:30,fill:'none',stroke:'transparent','stroke-width':4,'stroke-dasharray':'6,4'});
+  g.appendChild(ring); bot.ringEl=ring;
+  g.appendChild(el('circle',{r:24,fill:bot.color,stroke:'#111','stroke-width':3}));
+  const label=el('text',{x:0,y:6,'text-anchor':'middle','font-size':20,fill:'#fff','font-family':'Segoe UI,Arial','font-weight':'700'});
+  label.textContent=bot.id; g.appendChild(label);
+  const tagLbl=el('text',{x:0,y:-38,class:'bot-tag-label'});
+  tagLbl.textContent=tagOf[bot.start]; g.appendChild(tagLbl); bot.tagLblEl=tagLbl;
+  g.appendChild(el('rect',{x:-20,y:28,width:40,height:7,rx:3,fill:'#161820'}));
+  const battFill=el('rect',{x:-20,y:28,width:40,height:7,rx:3,fill:'#6bd05a'});
+  g.appendChild(battFill); bot.battFillEl=battFill;
+  g.addEventListener('click',(e)=>{ e.stopPropagation(); selectBot(bot.id); });
+  botLayer.appendChild(g); bot.gEl=g;
+  const pth=el('path',{class:'path-line',stroke:bot.color,'stroke-width':7});
+  pathLayer.appendChild(pth); bot.pathEl=pth;
+  const sidePth=el('path',{class:'path-line sidestep-marker',stroke:bot.color,'stroke-width':4});
+  pathLayer.appendChild(sidePth); bot.sidePathEl=sidePth;
+}
+
+function initBots(){
+  bots.forEach(b=>{ if(b.gEl) b.gEl.remove(); if(b.pathEl) b.pathEl.remove(); if(b.sidePathEl) b.sidePathEl.remove(); });
+  bots = BOT_DEFS.map(d=>({
+    id:d.id, name:'Bot '+d.id, color:d.color, basePriority:d.basePriority, start:d.start,
+    currentNode:d.start, path:[d.start], dest:null, waitTicks:0, effPriority:d.basePriority,
+    battery:100, status:'idle', waitingFor:null,
+    running:false, runStartNode:d.start, lastNote:null,
+    phase:'normal', originalNode:null, resumePath:null, conflictNode:null, blockerId:null,
+    gEl:null, pathEl:null, sidePathEl:null, ringEl:null, battFillEl:null, tagLblEl:null
+  }));
+  bots.forEach(makeBotVisual);
+  updatePositions(true);
+  selectedBotId=null;
+  obstacles.forEach(id=>removeObstacleIcon(id));
+  obstacles=new Set();
+  if(simTimer){ clearInterval(simTimer); simTimer=null; }
+  renderBotList();
+  clearLog();
+  updateGlobalRunButton();
+  log('info','Fleet reset. Select a bot, then click any node as its destination — the path highlights immediately, then press ▶ Play on that bot (or ▶ Play All) to send it moving.');
+}
+
+function selectBot(id){
+  selectedBotId=id;
+  bots.forEach(b=>{ b.ringEl.setAttribute('stroke', b.id===id? '#fff176':'transparent'); });
+  renderBotList();
+  log('info',`<b>Bot ${id}</b> selected. Click a destination node on the map.`);
+}
+
+function onNodeClick(nodeId){
+  if(obstacleMode){
+    if(bots.some(b=>b.currentNode===nodeId)){ log('warn',`Can't place an obstacle on ${locLabel(nodeId)} — a bot is there.`); return; }
+    if(obstacles.has(nodeId)){
+      obstacles.delete(nodeId); removeObstacleIcon(nodeId); log('info',`Obstacle removed at ${locLabel(nodeId)}.`);
+    } else {
+      obstacles.add(nodeId); drawObstacleIcon(nodeId); log('warn',`Obstacle placed at ${locLabel(nodeId)}.`);
+      replanAroundObstacle(nodeId); // check every bot's current/highlighted route in real time, moving or not
+    }
+    return;
+  }
+  if(!selectedBotId){ log('warn','Select a bot first, then click a destination.'); return; }
+  const bot = bots.find(b=>b.id===selectedBotId);
+  if(nodeId===bot.currentNode){ log('info',`<b>${bot.name}</b> is already at ${locLabel(nodeId)}.`); return; }
+  // Deliberately do NOT avoid other bots here — lets you choose overlapping paths
+  // or the same destination on purpose; live collisions are negotiated in the tick loop.
+  const path = aStar(bot.currentNode,nodeId,obstacles);
+  if(!path){ log('conflict',`No available path for <b>${bot.name}</b> to ${locLabel(nodeId)} (blocked by obstacles).`); return; }
+  bot.dest=nodeId;
+  bot.path=path;
+  bot.status='paused';      // path is set and highlighted, but it waits for an explicit Play
+  bot.running=false;
+  bot.runStartNode=bot.currentNode;
+  bot.waitingFor=null;
+  bot.lastNote=null;
+  bot.phase='normal'; bot.originalNode=null; bot.resumePath=null; bot.conflictNode=null; bot.blockerId=null;
+  bot.sidePathEl.setAttribute('d','');
+  drawBotPath(bot,path,true); // highlight full path BEFORE it moves
+  log('info',`<b>${bot.name}</b> destination set to <b>${locLabel(nodeId)}</b>. A* path highlighted (${path.length-1} hops) — press ▶ Play to send it.`);
+  updateBotPanel(bot);
+  // Auto-deselect once a destination is assigned so the next click on a different bot
+  // reliably selects THAT bot instead of re-routing the one you just commanded — this is
+  // what lets you queue up commands for every bot in quick succession.
+  selectedBotId=null;
+  bots.forEach(b=>b.ringEl.setAttribute('stroke','transparent'));
+  renderBotList();
+  updateGlobalRunButton();
+}
+
+/* Fires the instant a new obstacle is placed. Checks EVERY bot's currently planned
+   route — whether it's actively moving, mid side-step, or just sitting highlighted
+   and paused — and replans around the obstacle immediately (no waiting for a tick or
+   for the bot to be pressed play). Also drops a message naming the affected bot so
+   the shared event log effectively broadcasts the new obstacle to the whole fleet. */
+function replanAroundObstacle(nodeId){
+  let anyAffected=false;
+  bots.forEach(bot=>{
+    if(!bot.path || bot.path.length<2) return; // nothing queued for this bot
+    const remaining = bot.path.slice(1);
+    if(!remaining.includes(nodeId)) return; // obstacle isn't on this bot's route
+
+    anyAffected=true;
+    const isFullRoute = bot.phase==='normal';
+    const target = isFullRoute ? bot.dest : bot.path[bot.path.length-1];
+
+    const tempBlocked = new Set(obstacles);
+    bots.forEach(b=>{ if(b!==bot) tempBlocked.add(b.currentNode); });
+    if(target) tempBlocked.delete(target);
+
+    const newPath = target ? aStar(bot.currentNode, target, tempBlocked) : null;
+
+    if(newPath && newPath.length>1){
+      bot.path = newPath;
+      if(isFullRoute){
+        bot.sidePathEl.setAttribute('d','');
+        drawBotPath(bot, newPath, true);
+      } else {
+        drawSidePath(bot, bot.currentNode, target);
+      }
+      bot.lastNote = `🚧 Obstacle at ${locLabel(nodeId)} — rerouted (${newPath.length-1} hops).`;
+      log('conflict', `🚧 <b>${bot.name}</b>: new obstacle placed at ${locLabel(nodeId)} was on its planned route — auto-rerouted around it, ${newPath.length-1}-hop path to ${locLabel(bot.dest)}. Heads up to the rest of the fleet: ${locLabel(nodeId)} is now blocked.`);
+    } else if(isFullRoute){
+      bot.lastNote = `🚧 Obstacle at ${locLabel(nodeId)} — no route yet, waiting.`;
+      log('conflict', `🚧 <b>${bot.name}</b>: new obstacle at ${locLabel(nodeId)} blocks its route to ${locLabel(bot.dest)} and no alternate path exists right now — it will hold and keep trying as things clear.`);
+    } else {
+      // side-step / return leg got cut off — cancel the maneuver and fall back to a fresh full route
+      bot.phase='normal';
+      bot.sidePathEl.setAttribute('d','');
+      const fallbackBlocked = new Set(obstacles);
+      bots.forEach(b=>{ if(b!==bot) fallbackBlocked.add(b.currentNode); });
+      if(bot.dest) fallbackBlocked.delete(bot.dest);
+      const fallback = bot.dest ? aStar(bot.currentNode, bot.dest, fallbackBlocked) : null;
+      if(fallback && fallback.length>1){
+        bot.path = fallback;
+        bot.status = bot.running ? 'moving' : 'paused';
+        drawBotPath(bot, fallback, true);
+        bot.lastNote = `🚧 Obstacle at ${locLabel(nodeId)} — interrupted side-step, replanned.`;
+        log('conflict', `🚧 <b>${bot.name}</b>: new obstacle at ${locLabel(nodeId)} interrupted its side-step maneuver — replanned a fresh ${fallback.length-1}-hop route to ${locLabel(bot.dest)}.`);
+      } else {
+        bot.path=[bot.currentNode];
+        bot.status='waiting';
+        bot.lastNote = `🚧 Obstacle at ${locLabel(nodeId)} — holding, no route available.`;
+        log('conflict', `🚧 <b>${bot.name}</b>: new obstacle at ${locLabel(nodeId)} blocked its side-step maneuver and no route is available — holding in place.`);
+      }
+    }
+    updateBotPanel(bot);
+  });
+  if(anyAffected) updateGlobalRunButton();
+}
+
+function toggleAllRun(){
+  const commandable = bots.filter(b=>b.path && b.path.length>1);
+  if(commandable.length===0){
+    log('warn','No bot has a destination set yet — click a bot, then a destination node, first.');
+    return;
+  }
+  const anyRunning = commandable.some(b=>b.running);
+  if(anyRunning){
+    commandable.filter(b=>b.running).forEach(b=>{
+      b.running=false;
+      if(b.status==='moving' || b.status==='sidestepping' || b.status==='returning') b.status='paused';
+      updateBotPanel(b);
+    });
+    log('info','⏸ All bots paused.');
+  } else {
+    commandable.forEach(b=>{
+      b.running=true;
+      if(b.phase==='normal') b.status='moving';
+      else if(b.phase==='sidestep-out') b.status='sidestepping';
+      else if(b.phase==='returning') b.status='returning';
+      updateBotPanel(b);
+    });
+    log('info','▶️ All bots resumed/started.');
+    ensureSimRunning();
+  }
+  updateGlobalRunButton();
+}
+function updateGlobalRunButton(){
+  const btn=document.getElementById('btnPlayPauseAll');
+  if(!btn) return;
+  const commandable = bots.filter(b=>b.path && b.path.length>1);
+  if(commandable.length===0){
+    btn.disabled=true; btn.classList.remove('active'); btn.textContent='▶ Play All';
+    return;
+  }
+  btn.disabled=false;
+  const anyRunning = commandable.some(b=>b.running);
+  btn.textContent = anyRunning ? '⏸ Pause All' : '▶ Play All';
+  btn.classList.toggle('active', anyRunning);
+}
+
+function toggleBotRun(id){
+  const bot = bots.find(b=>b.id===id);
+  if(!bot) return;
+  if(!bot.path || bot.path.length<2){
+    log('warn', `<b>${bot.name}</b> has no destination set yet — click the bot, then a destination node.`);
+    return;
+  }
+  bot.running = !bot.running;
+  if(bot.running){
+    if(bot.phase==='normal') bot.status='moving';
+    else if(bot.phase==='sidestep-out') bot.status='sidestepping';
+    else if(bot.phase==='returning') bot.status='returning';
+    // 'sidestep-wait' keeps its own status text until the blocker clears
+    log('info', `▶️ <b>${bot.name}</b> ${bot.currentNode!==bot.runStartNode?'resumed':'started moving'} toward <b>${locLabel(bot.dest)}</b>.`);
+    ensureSimRunning();
+  } else {
+    log('info', `⏸ <b>${bot.name}</b> paused at ${locLabel(bot.currentNode)}.`);
+    if(bot.status==='moving' || bot.status==='sidestepping' || bot.status==='returning') bot.status='paused';
+  }
+  updateBotPanel(bot);
+  updateGlobalRunButton();
+}
+
+function drawBotPath(bot,path,flash){
+  const pts = path.map(id=>`${nodes[id].x},${nodes[id].y}`).join(' L ');
+  bot.pathEl.setAttribute('d', path.length>1 ? `M ${pts}` : '');
+  if(flash){ bot.pathEl.classList.remove('flash'); void bot.pathEl.offsetWidth; bot.pathEl.classList.add('flash'); }
+}
+function drawSidePath(bot,fromNode,toNode){
+  bot.sidePathEl.setAttribute('d', `M ${nodes[fromNode].x},${nodes[fromNode].y} L ${nodes[toNode].x},${nodes[toNode].y}`);
+}
+
+function updatePositions(instant){
+  bots.forEach(b=>{
+    const p=nodes[b.currentNode];
+    if(instant) b.gEl.style.transition='none';
+    b.gEl.setAttribute('transform',`translate(${p.x},${p.y})`);
+    b.tagLblEl.textContent = tagOf[b.currentNode];
+    if(instant){ void b.gEl.getBBox(); b.gEl.style.transition='transform .45s linear'; }
+  });
+}
+
+/* ============================== CONCURRENT TICK ENGINE WITH PRIORITY NEGOTIATION + SIDE-STEPPING ============================== */
+function ensureSimRunning(){ if(!simTimer) simTimer=setInterval(simTick,tickMs); }
+function anyBotActive(){ return bots.some(b=>b.running && b.path && b.path.length>1); }
+
+function simTick(){
+  // PRE-PASS: bots parked aside (and currently running) check whether the blocker has cleared the way yet.
+  for(const bot of bots){
+    if(bot.phase==='sidestep-wait' && bot.running){
+      const blocker = bot.blockerId ? bots.find(b=>b.id===bot.blockerId) : null;
+      const passed = bot.blockerId
+        ? (!blocker || (blocker.currentNode!==bot.conflictNode && blocker.currentNode!==bot.originalNode))
+        : !obstacles.has(bot.conflictNode); // sidestep was caused by an obstacle — wait for it to be cleared
+      if(passed){
+        bot.phase='returning';
+        bot.path=[bot.currentNode, bot.originalNode];
+        bot.status='returning';
+        bot.waitingFor=null;
+        drawSidePath(bot,bot.currentNode,bot.originalNode);
+        log('info', `↩️ <b>${bot.name}</b> returns to its original position ${locLabel(bot.originalNode)} now that ${blocker?blocker.name:'the obstacle'} has cleared.`);
+      }
+    }
+  }
+
+  // A bot counts as a stationary obstacle for everyone else if it has no path left,
+  // OR it's currently paused by the user (even mid-route).
+  const idleOccupied = new Set(bots.filter(b=>!b.path||b.path.length<=1||!b.running).map(b=>b.currentNode));
+  const order=[...bots].sort((a,b)=>a.effPriority-b.effPriority); // lower value = acts first
+  const reservedThisTick = new Map(); // node -> bot object
+  const movingBots=[];
+
+  for(const bot of order){
+    if(!bot.path || bot.path.length<2) continue;
+    if(!bot.running) continue; // paused bots simply hold their position this tick
+    let next=bot.path[1];
+    let conflict=false, blockerBot=null, reason='', isObstacle=false;
+
+    if(obstacles.has(next)){
+      conflict=true; isObstacle=true;
+      reason=`a newly placed obstacle blocks ${locLabel(next)}`;
+    }
+    if(!conflict && reservedThisTick.has(next)){
+      conflict=true; blockerBot=reservedThisTick.get(next);
+      reason=`both want ${locLabel(next)} at the same time`;
+    }
+    if(!conflict && idleOccupied.has(next) && next!==bot.currentNode){
+      const parked = bots.find(b=>b.currentNode===next);
+      conflict=true; blockerBot=parked;
+      reason = parked ? `${parked.name} is currently at ${locLabel(next)}` : `a bot occupies ${locLabel(next)}`;
+    }
+    if(!conflict){
+      const occupant = bots.find(b=>b!==bot && b.currentNode===next && b.path && b.path.length>1 && b.running);
+      if(occupant && occupant.path[1]===bot.currentNode){
+        conflict=true; blockerBot=occupant;
+        reason=`head-on swap between ${locLabel(bot.currentNode)} and ${locLabel(next)}`;
+      }
+    }
+
+    if(conflict){
+      const iWin = !isObstacle && blockerBot && bot.effPriority < blockerBot.effPriority;
+      if(iWin && !reservedThisTick.has(next) && !idleOccupied.has(next)){
+        reservedThisTick.set(next,bot); movingBots.push(bot); bot.waitTicks=0; bot.waitingFor=null;
+        continue;
+      }
+
+      flashConflict(next);
+      if(isObstacle){
+        bot.lastNote = `🚧 Obstacle at ${locLabel(next)} — rerouting.`;
+        log('conflict', `🚧 <b>${bot.name}</b> encountered a newly placed obstacle at ${locLabel(next)} on its route — rerouting automatically. Rest of the fleet: ${locLabel(next)} is blocked.`);
+      } else {
+        log('conflict', `⚠ Collision predicted: <b>${bot.name}</b> and <b>${blockerBot?blockerBot.name:'another bot'}</b> — ${reason}. Negotiating priority…`);
+      }
+
+
+      if(bot.phase==='normal'){
+        // 1) PREFERRED: dynamic A* rerouting — replan a fresh path to the same destination
+        // that avoids the contested node, obstacles, and every other bot's current position.
+        // This happens automatically for the lower-priority bot; no manual input needed.
+        const tempBlocked = new Set(obstacles);
+        tempBlocked.add(next);
+        bots.forEach(b=>{ if(b!==bot) tempBlocked.add(b.currentNode); });
+        reservedThisTick.forEach((_,node)=>tempBlocked.add(node));
+        tempBlocked.delete(bot.dest);
+        const reroute = bot.dest ? aStar(bot.currentNode, bot.dest, tempBlocked) : null;
+
+        if(reroute && reroute.length>1){
+          bot.path = reroute;
+          bot.status = 'moving';
+          bot.waitingFor = null;
+          bot.waitTicks = 0;
+          bot.sidePathEl.setAttribute('d','');
+          drawBotPath(bot, reroute, true);
+          log('reroute', `🔄 <b>${bot.name}</b> (priority ${bot.basePriority+1}) reroutes around <b>${blockerBot?blockerBot.name:'the obstruction'}</b> using A* — new ${reroute.length-1}-hop path to <b>${locLabel(bot.dest)}</b>.`);
+          continue; // path replaced; its first hop is (re)validated fresh next tick
+        }
+
+        // 2) FALLBACK: no alternate route exists at all (e.g. single-file dead end) —
+        // step aside one node so the higher-priority bot can pass, then return afterward.
+        const usedNodes = new Set([...tempBlocked, ...idleOccupied]);
+        const sideCandidates = (adj[bot.currentNode]||[]).map(e=>e.to).filter(n=> n!==next && !usedNodes.has(n));
+
+        if(sideCandidates.length>0){
+          const sideNode=sideCandidates[0];
+          bot.originalNode = bot.currentNode;
+          bot.resumePath = bot.path.slice();
+          bot.conflictNode = next;
+          bot.blockerId = blockerBot ? blockerBot.id : null;
+          bot.path=[bot.currentNode, sideNode];
+          bot.phase='sidestep-out';
+          bot.status='sidestepping';
+          bot.waitingFor = isObstacle ? 'an obstacle to clear' : blockerBot.name;
+          reservedThisTick.set(sideNode, bot);
+          movingBots.push(bot);
+          drawSidePath(bot, bot.currentNode, sideNode);
+          if(isObstacle){
+            log('reroute', `🤝 <b>${bot.name}</b> can't route around the obstacle at ${locLabel(next)} yet — stepping aside to ${locLabel(sideNode)} while it waits for the way to clear.`);
+          } else {
+            log('reroute', `🤝 <b>${bot.name}</b> (priority ${bot.basePriority+1}) yields to <b>${blockerBot.name}</b> (priority ${blockerBot.basePriority+1}) — no A* alternative, stepping aside to ${locLabel(sideNode)} to let it pass.`);
+          }
+        } else {
+          bot.waitTicks=(bot.waitTicks||0)+1;
+          bot.status='waiting';
+          bot.waitingFor = isObstacle ? 'an obstacle ahead' : (blockerBot?blockerBot.name:'another bot');
+          log('conflict', `<b>${bot.name}</b> ${isObstacle?'is blocked by an obstacle':'yields to <b>'+(blockerBot?blockerBot.name:'?')+'</b>'} — no route or space to step aside, waiting in place.`);
+        }
+      } else {
+        // already mid-maneuver (sidestepping/returning) and hit a new conflict — just hold this tick
+        bot.waitTicks=(bot.waitTicks||0)+1;
+        bot.waitingFor = blockerBot?blockerBot.name:bot.waitingFor;
+        log('conflict', `<b>${bot.name}</b> pauses mid-maneuver — <b>${blockerBot?blockerBot.name:'another bot'}</b> is in the way.`);
+      }
+    } else {
+      reservedThisTick.set(next,bot);
+      movingBots.push(bot);
+      bot.waitTicks=0;
+      if(bot.phase==='normal'){ bot.waitingFor=null; bot.status='moving'; }
+    }
+  }
+
+  for(const bot of movingBots){
+    bot.currentNode=bot.path[1];
+    bot.path.shift();
+
+    if(bot.path.length<=1){
+      if(bot.phase==='sidestep-out'){
+        bot.phase='sidestep-wait';
+        bot.status='waiting-aside';
+        log('info', `⏸ <b>${bot.name}</b> is stepped aside at ${locLabel(bot.currentNode)}, waiting for <b>${bot.waitingFor}</b> to pass.`);
+      } else if(bot.phase==='returning'){
+        bot.phase='normal';
+        bot.status='moving';
+        bot.path = bot.resumePath;
+        bot.sidePathEl.setAttribute('d','');
+        bot.resumePath=null; bot.conflictNode=null; bot.blockerId=null; bot.originalNode=null; bot.waitingFor=null;
+        log('info', `▶️ <b>${bot.name}</b> is back on its original path and continues toward <b>${locLabel(bot.dest)}</b>.`);
+        drawBotPath(bot,bot.path,true);
+      } else {
+        bot.status='arrived';
+        bot.running=false;
+        bot.lastNote=null;
+        bot.pathEl.setAttribute('d','');
+        log('arrive', `<b>${bot.name}</b> arrived at <b>${locLabel(bot.dest)}</b>.`);
+        bot.dest=null;
+      }
+    } else {
+      if(bot.phase==='sidestep-out') bot.status='sidestepping';
+      else if(bot.phase==='returning') bot.status='returning';
+      else { bot.status='moving'; drawBotPath(bot, bot.path, false); }
+    }
+  }
+  updatePositions(false);
+
+  bots.forEach(b=>{
+    const moved=movingBots.includes(b);
+    b.battery -= moved?0.9:0.2;
+    if(!moved && (b.status==='idle' || b.status==='arrived')) b.battery=Math.min(100,b.battery+0.5); // passive trickle-charge while parked (no dock in this layout)
+    b.battery=Math.max(0,b.battery);
+    // priority aging: the longer a bot waits, the better its effective priority gets,
+    // guaranteeing it eventually gets to move and preventing deadlock/starvation
+    b.effPriority = b.basePriority - (b.waitTicks||0)*0.2;
+    updateBotPanel(b);
+  });
+
+  const stillActive = bots.some(b=> b.running && (b.phase!=='normal' || (b.path && b.path.length>1)));
+  if(!stillActive){ clearInterval(simTimer); simTimer=null; }
+  updateGlobalRunButton();
+}
+
+/* ============================== LOG ============================== */
+function clearLog(){ document.getElementById('logBox').innerHTML=''; }
+function log(type,msg){
+  const box=document.getElementById('logBox');
+  const e=document.createElement('div');
+  e.className='log-entry '+type;
+  const t=new Date().toLocaleTimeString([], {hour12:false});
+  e.innerHTML=`<span style="color:var(--muted);margin-right:5px;">${t}</span>${msg}`;
+  box.prepend(e);
+  while(box.children.length>150) box.removeChild(box.lastChild);
+}
+
+/* ============================== SIDE PANEL ============================== */
+function renderBotList(){
+  const list=document.getElementById('botsList');
+  list.innerHTML='';
+  bots.forEach(b=>{
+    const card=document.createElement('div');
+    card.className='bot-card'+(b.id===selectedBotId?' selected':'');
+    card.style.setProperty('--c',b.color);
+    card.onclick=(e)=>{ if(e.target.closest('.run-btn')) return; selectBot(b.id); };
+    list.appendChild(card);
+    card.innerHTML = cardHTML(b);
+  });
+}
+function statusText(b){
+  if(b.status==='paused') return 'paused';
+  if(b.status==='waiting-aside') return `stepped aside — waiting for ${b.waitingFor}`;
+  if(b.status==='sidestepping') return `stepping aside for ${b.waitingFor}`;
+  if(b.status==='returning') return `returning to original position`;
+  if(b.status==='waiting' && b.waitingFor) return `waiting for ${b.waitingFor}`;
+  if(b.id===selectedBotId && b.status==='idle') return 'selected';
+  return b.status;
+}
+function statusClass(b){
+  if(b.status==='paused') return 'paused';
+  if(b.status==='waiting-aside' || b.status==='waiting') return 'waiting';
+  if(b.status==='sidestepping' || b.status==='returning') return 'sidestep';
+  if(b.id===selectedBotId && b.status==='idle') return 'selected';
+  return b.status;
+}
+function runButtonInfo(b){
+  const hasPath = b.path && b.path.length>1;
+  if(!hasPath) return {label:'▶ Play', disabled:true, pauseMode:false};
+  if(b.running) return {label:'⏸ Pause', disabled:false, pauseMode:true};
+  const resumed = b.currentNode!==b.runStartNode;
+  return {label: resumed ? '▶ Resume' : '▶ Play', disabled:false, pauseMode:false};
+}
+function cardHTML(b){
+  const rb = runButtonInfo(b);
+  return `
+    <div class="row1"><span>${b.name}</span><span class="status ${statusClass(b)}" id="st-${b.id}">${statusText(b)}</span></div>
+    <div class="meta"><span>Priority: <b>${b.basePriority+1}${b.waitTicks?` (aged ${b.effPriority.toFixed(2)})`:''}</b></span><span>Battery: <b id="batt-${b.id}">${Math.round(b.battery)}%</b></span></div>
+    <div class="meta"><span>Destination: <b id="tg-${b.id}">${b.dest?locLabel(b.dest):'—'}</b></span></div>
+    <div class="tag" id="tag-${b.id}">📍 ${locLabel(b.currentNode)}</div>
+    ${b.lastNote ? `<div class="tag note" id="note-${b.id}">${b.lastNote}</div>` : ''}
+    <div class="batt-bar"><div class="batt-fill" id="battbar-${b.id}" style="width:${b.battery}%;background:#6bd05a"></div></div>
+    <button type="button" class="run-btn${rb.pauseMode?' pause-mode':''}" id="run-${b.id}" ${rb.disabled?'disabled':''} onclick="toggleBotRun('${b.id}')">${rb.label}</button>
+  `;
+}
+function updateBotPanel(bot){
+  const card=document.getElementById('st-'+bot.id);
+  if(!card){ renderBotList(); return; }
+  card.parentElement.parentElement.innerHTML = cardHTML(bot);
+}
+
+/* ============================== CONTROLS ============================== */
+document.getElementById('btnObstacle').onclick=(e)=>{
+  obstacleMode=!obstacleMode;
+  e.target.classList.toggle('active',obstacleMode);
+  e.target.textContent = obstacleMode ? '🚧 Placing… (click map)' : '🚧 Place Obstacle';
+  log('info', obstacleMode? 'Obstacle mode ON — click any node to block/unblock it.' : 'Obstacle mode OFF.');
+};
+document.getElementById('btnClearObstacles').onclick=()=>{
+  obstacles.forEach(id=>removeObstacleIcon(id));
+  obstacles=new Set();
+  log('info','All obstacles cleared.');
+};
+document.getElementById('btnReset').onclick=initBots;
+document.getElementById('btnPlayPauseAll').onclick=toggleAllRun;
+document.getElementById('speed').oninput=(e)=>{
+  tickMs=Number(e.target.value);
+  document.getElementById('tickLbl').textContent=tickMs+'ms';
+  if(simTimer){ clearInterval(simTimer); simTimer=setInterval(simTick,tickMs); }
+};
+
+/* ============================== INIT ============================== */
+initBots();
+</script>
+</body>
+</html>
