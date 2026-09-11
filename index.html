@@ -120,17 +120,151 @@ input[type=range]{
   flex:1;
   min-width:0;
   position:relative;
-  overflow:auto;
+  overflow:hidden;
   display:flex;
-  align-items:center;
-  justify-content:center;
+  flex-direction:column;
+  align-items:stretch;
+  justify-content:flex-start;
   background:#101318;
+  padding-top:50px;
 }
 
 #map{
   width:100%;
   height:100%;
-  min-width:850px;
+  min-width:0;
+  min-height:0;
+  flex:1 1 auto;
+  display:block;
+  object-fit:contain;
+}
+
+.task-queue-panel{
+  flex:0 0 88px;
+  height:88px;
+  border-top:1px solid var(--line);
+  background:#14181e;
+  padding:6px 10px;
+  overflow:hidden;
+}
+
+.task-queue-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:4px;
+}
+
+.task-queue-title{
+  color:var(--text);
+  font-size:11px;
+  font-weight:800;
+  letter-spacing:.9px;
+  text-transform:uppercase;
+}
+
+.task-queue-help{
+  color:var(--muted);
+  font-size:9px;
+}
+
+.task-queue{
+  height:58px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  display:flex;
+  gap:7px;
+  align-items:stretch;
+}
+
+.queue-empty{
+  min-width:220px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:1px dashed #39424f;
+  border-radius:6px;
+  color:#788394;
+  font-size:10px;
+}
+
+.task-card{
+  flex:0 0 185px;
+  height:56px;
+  border:1px solid #303844;
+  border-radius:6px;
+  background:#1c222a;
+  padding:5px 7px;
+  position:relative;
+}
+
+.task-card.assigned{
+  border-left:3px solid var(--cyan);
+}
+
+.task-card.queued{
+  border-left:3px solid var(--yellow);
+}
+
+.task-card.completed{
+  border-left:3px solid var(--green);
+  opacity:.7;
+}
+
+.task-card.failed-recovery{
+  border-left-color:var(--red);
+}
+
+.task-card-id{
+  font-family:Consolas,monospace;
+  color:#aeb8c8;
+  font-size:8px;
+}
+
+.task-card-name{
+  color:#edf1f7;
+  font-size:10px;
+  font-weight:700;
+  margin-top:3px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+.task-card-meta{
+  margin-top:2px;
+  color:#8792a3;
+  font-size:8px;
+  line-height:1.35;
+}
+
+.task-card-status{
+  position:absolute;
+  right:7px;
+  top:7px;
+  font-size:7.5px;
+  font-weight:800;
+  text-transform:uppercase;
+  padding:3px 5px;
+  border-radius:8px;
+  background:#303741;
+  color:#b5bfcd;
+}
+
+.task-card.assigned .task-card-status{
+  background:#183b49;
+  color:#78dfff;
+}
+
+.task-card.queued .task-card-status{
+  background:#4b3a18;
+  color:#f4d27b;
+}
+
+.task-card.completed .task-card-status{
+  background:#183a2a;
+  color:#72e3a5;
 }
 
 /* ================= MAP HUD ================= */
@@ -141,16 +275,18 @@ input[type=range]{
   top:14px;
   z-index:5;
   display:flex;
-  gap:7px;
+  gap:5px;
+  flex-wrap:wrap;
+  max-width:calc(100% - 28px);
   pointer-events:none;
 }
 
 .hud-item{
-  padding:7px 10px;
+  padding:5px 7px;
   border:1px solid #313945;
   border-radius:6px;
   background:rgba(19,23,29,.92);
-  font-size:10px;
+  font-size:8px;
   color:var(--muted);
 }
 
@@ -415,7 +551,7 @@ input[type=range]{
 /* ================= LOCATION MONITOR ================= */
 
 .location-panel{
-  flex:0 0 125px;
+  flex:0 0 160px;
   border-top:1px solid var(--line);
   background:#13171c;
   padding:9px;
@@ -423,7 +559,7 @@ input[type=range]{
 }
 
 .location-table{
-  height:88px;
+  height:123px;
   overflow-y:auto;
   border:1px solid #2d3540;
   border-radius:5px;
@@ -710,6 +846,97 @@ input[type=range]{
   font-size:9px;
   font-weight:700;
 }
+
+.primary-action{
+  background:#2563eb !important;
+  border-color:#3b82f6 !important;
+  color:#fff !important;
+  font-weight:800;
+  box-shadow:0 0 0 1px rgba(59,130,246,.18),0 4px 14px rgba(37,99,235,.18);
+}
+.primary-action:hover{
+  background:#1d4ed8 !important;
+}
+
+/* SIH demo additions */
+.demo-strip{
+  display:flex;
+  gap:7px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+.demo-chip{
+  border:1px solid #303944;
+  background:#171c23;
+  border-radius:5px;
+  padding:3px 6px;
+  color:#8e9aab;
+  font-size:7px;
+  font-weight:700;
+  letter-spacing:.4px;
+}
+.demo-chip b{color:#dce5ef}
+.demo-chip.online b{color:#67e8a2}
+.performance-panel{
+  margin-top:7px;
+  border:1px solid #303844;
+  border-radius:7px;
+  background:#151a20;
+  padding:8px;
+}
+.performance-title{
+  font-size:9px;
+  font-weight:800;
+  letter-spacing:.8px;
+  color:#9ca8b8;
+  margin-bottom:6px;
+}
+.perf-grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:6px;
+}
+.perf-box{
+  background:#1c222a;
+  border:1px solid #2d3540;
+  border-radius:5px;
+  padding:6px;
+  text-align:center;
+}
+.perf-label{font-size:7px;color:#7f8b9b;text-transform:uppercase}
+.perf-value{font-size:15px;font-weight:800;color:#eef3f8;margin-top:2px}
+.perf-value.good{color:#6ee7a0}
+.comm-line{
+  font-size:8px;
+  color:#8e9aaa;
+  margin-top:5px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.comm-line b{color:#cdd6e2}
+
+
+/* Final header spacing: slightly larger primary architecture cards */
+.hud-item{
+  min-width:0;
+  line-height:1.25;
+}
+.hud-item b{
+  display:inline-block;
+  margin-top:2px;
+  max-width:100%;
+}
+.demo-strip{
+  gap:8px;
+  min-width:0;
+}
+.demo-chip{
+  font-size:8.5px;
+  padding:5px 8px;
+  white-space:nowrap;
+}
+
 </style>
 </head>
 
@@ -730,7 +957,7 @@ input[type=range]{
   </div>
 
   <div class="ctrl">
-    <button id="playAllBtn">Play All</button>
+    <button id="playAllBtn" class="primary-action">▶ Play All</button>
   </div>
 
   <div class="ctrl">
@@ -752,11 +979,23 @@ input[type=range]{
       <div class="hud-item">LOCALIZATION <b>AprilTag</b></div>
       <div class="hud-item">PLANNING <b>A*</b></div>
       <div class="hud-item">COORDINATION <b>PEER-TO-PEER</b></div>
-      <div class="hud-item">CONTROL <b>CLICK BOT → CLICK NODE</b></div>
+      <div class="hud-item">TASKING <b>CLICK APRILTAG → QUEUE → SHORTEST A* AMR</b></div>
+    <div class="demo-strip">
+      <div class="demo-chip online">P2P <b>● CONNECTED</b></div>
+      <div class="demo-chip">EDGE <b>RASPBERRY PI 5</b></div>
+    </div>
     </div>
 
     <svg id="map" viewBox="0 0 1920 1080"
          xmlns="http://www.w3.org/2000/svg"></svg>
+
+    <div class="task-queue-panel">
+      <div class="task-queue-head">
+        <div class="task-queue-title">Task Queue</div>
+        <div class="task-queue-help">Click AprilTag → create task · shortest feasible A* bot is selected · press ▶ Play All</div>
+      </div>
+      <div class="task-queue" id="taskQueue"></div>
+    </div>
 
   </section>
 
@@ -1315,35 +1554,27 @@ function removeObstacle(id){
 const BOT_DEFS = [
   {
     id:"A",
-    color:"#9A5A1F",
-    routeColor:"#C47A2C",
-    start:"S-3",
-    priority:1,
-    taskName:"Order Fulfillment"
+    color:"#8B5A2B",
+    routeColor:"#D4A017",
+    start:"S-3"
   },
   {
     id:"B",
     color:"#FF3B4D",
     routeColor:"#FF8A94",
-    start:"S-5",
-    priority:2,
-    taskName:"Inventory Transfer"
+    start:"S-5"
   },
   {
     id:"C",
     color:"#00C853",
     routeColor:"#69F0AE",
-    start:"S-7",
-    priority:3,
-    taskName:"Shelf Replenishment"
+    start:"S-7"
   },
   {
     id:"D",
     color:"#A855F7",
     routeColor:"#D8A7FF",
-    start:"S-9",
-    priority:4,
-    taskName:"Package Delivery"
+    start:"S-9"
   }
 ];
 
@@ -1360,6 +1591,8 @@ let obstacleMode = false;
 let timer = null;
 let tickMs = 500;
 let pendingReassignments = [];
+let taskQueue = [];
+let nextTaskNumber = 1;
 
 
 /* ============================================================
@@ -1464,13 +1697,14 @@ function initBots(){
 
   obstacles = new Set();
   pendingReassignments = [];
+  taskQueue = [];
+  nextTaskNumber = 1;
 
   bots = BOT_DEFS.map(d=>({
     id:d.id,
     color:d.color,
     routeColor:d.routeColor || d.color,
     start:d.start,
-    priority:d.priority,
 
     currentNode:d.start,
     path:[d.start],
@@ -1484,7 +1718,7 @@ function initBots(){
     battery:100,
 
     task: TASK.UNASSIGNED,
-    taskName:d.taskName,
+    taskName:"Task Not Assigned",
     taskId:null,
 
     takeover:false,
@@ -1499,7 +1733,6 @@ function initBots(){
     failedTaskCompletedBy:null,
 
     waitTicks:0,
-    effectivePriority:d.priority,
     waitingFor:null,
 
     note:null,
@@ -1519,9 +1752,10 @@ function initBots(){
   updatePositions(true);
   renderBotCards();
   renderLocations();
+  renderTaskQueue();
   updateFleetStats();
 
-  log("info","Fleet initialized. Select an AMR and choose a destination AprilTag.");
+  log("info","Fleet initialized. Click any AprilTag to create a task; the closest available AMR is selected by shortest A* path.");
 }
 
 
@@ -1603,16 +1837,10 @@ function onNodeClick(nodeId){
 
     if(
       bots.some(
-        b=>!b.failed &&
-        b.currentNode===nodeId
+        b=>!b.failed && b.currentNode===nodeId
       )
     ){
-
-      log(
-        "warn",
-        `Node ${locLabel(nodeId)} is occupied by an AMR.`
-      );
-
+      log("warn",`Node ${locLabel(nodeId)} is occupied by an AMR.`);
       return;
     }
 
@@ -1621,21 +1849,14 @@ function onNodeClick(nodeId){
       obstacles.delete(nodeId);
       removeObstacle(nodeId);
 
-      log(
-        "info",
-        `Obstacle removed from ${locLabel(nodeId)}.`
-      );
+      log("info",`Obstacle removed from ${locLabel(nodeId)}.`);
 
     }else{
 
       obstacles.add(nodeId);
       drawObstacle(nodeId);
 
-      log(
-        "warn",
-        `Obstacle placed at ${locLabel(nodeId)}.`
-      );
-
+      log("warn",`Obstacle placed at ${locLabel(nodeId)}.`);
       replanForObstacle(nodeId);
     }
 
@@ -1643,80 +1864,208 @@ function onNodeClick(nodeId){
     return;
   }
 
-  if(!selectedBotId){
+  /*
+    Normal map click = CREATE A TASK.
+    The operator does not choose the robot.
+    The fleet chooses the available AMR with the
+    shortest feasible A* path to the selected goal.
+  */
+  createTask(nodeId);
+}
+
+
+function createTask(destination){
+
+  if(obstacles.has(destination)){
 
     log(
       "warn",
-      "Select an AMR before selecting a destination."
+      `Cannot create a task at blocked destination ${locLabel(destination)}.`
     );
 
     return;
   }
 
-  const bot = bots.find(
-    b=>b.id===selectedBotId
-  );
+  const task = {
+    id:`TASK-${String(nextTaskNumber++).padStart(3,"0")}`,
+    name:`Warehouse Task ${String(nextTaskNumber-1).padStart(3,"0")}`,
+    destination,
+    status:"queued",
+    assignedBotId:null,
+    failedBotId:null,
+    takeover:false,
+    createdAt:Date.now()
+  };
 
-  if(!bot || bot.failed) return;
-
-  if(nodeId===bot.currentNode){
-
-    log(
-      "info",
-      `<b>Bot ${bot.id}</b> is already at ${locLabel(nodeId)}.`
-    );
-
-    return;
-  }
-
-  const path = aStar(
-    bot.currentNode,
-    nodeId,
-    getBlockedNodes(bot)
-  );
-
-  if(!path){
-
-    log(
-      "conflict",
-      `<b>Bot ${bot.id}</b> has no available A* path to ${locLabel(nodeId)}.`
-    );
-
-    return;
-  }
-
-  bot.destination = nodeId;
-  bot.path = path;
-
-  bot.task = TASK.ASSIGNED;
-  bot.taskId = "TASK-" + Math.floor(1000 + Math.random()*9000);
-
-  bot.running = false;
-  bot.status = "paused";
-  bot.note = null;
-
-  drawBotPath(bot,path,true);
-  showGoal(bot,nodeId);
+  taskQueue.push(task);
 
   log(
     "info",
-    `<b>Bot ${bot.id}</b> assigned <b>${bot.taskName}</b> → ${locLabel(nodeId)}. A* path ready.`
+    `<b>${task.id}</b> added to queue for destination <b>${locLabel(destination)}</b>.`
   );
 
-  selectedBotId = null;
+  dispatchQueuedTasks();
 
-  bots.forEach(b=>{
-    b.ringEl.setAttribute(
-      "stroke",
-      "transparent"
-    );
-    b.gEl.classList.remove("selected-bot");
-  });
-
+  renderTaskQueue();
   renderBotCards();
   updateFleetStats();
 }
 
+
+function availableBots(){
+
+  return bots.filter(
+    b=>
+      !b.failed &&
+      !b.takeover &&
+      !b.destination &&
+      b.path.length<=1 &&
+      (b.status==="idle" || b.status==="arrived")
+  );
+}
+
+
+/*
+  Find the globally closest bot-task pair by actual A* path
+  cost. This avoids assigning a nearby task to a far-away bot
+  while a better AMR is available.
+*/
+function findBestTaskAssignment(){
+
+  let best = null;
+
+  for(const task of taskQueue){
+
+    if(task.status!=="queued") continue;
+
+    for(const bot of availableBots()){
+
+      const blocked = getBlockedNodes(bot);
+      blocked.delete(task.destination);
+
+      const path = aStar(
+        bot.currentNode,
+        task.destination,
+        blocked
+      );
+
+      if(!path || path.length<2) continue;
+
+      const cost = pathDistance(path);
+
+      if(!best || cost<best.cost){
+
+        best = {
+          task,
+          bot,
+          path,
+          cost
+        };
+      }
+    }
+  }
+
+  return best;
+}
+
+
+function pathDistance(path){
+
+  let total = 0;
+
+  for(let i=1;i<path.length;i++){
+
+    const a = nodes[path[i-1]];
+    const b = nodes[path[i]];
+
+    total += Math.hypot(
+      a.x-b.x,
+      a.y-b.y
+    );
+  }
+
+  return total;
+}
+
+
+/*
+  Dispatch as many queued tasks as possible.
+  Repeats after every assignment so multiple idle AMRs
+  can receive the closest available tasks.
+*/
+function dispatchQueuedTasks(){
+
+  while(true){
+
+    const best = findBestTaskAssignment();
+
+    if(!best) break;
+
+    const {task,bot,path} = best;
+
+    task.status = "assigned";
+    task.assignedBotId = bot.id;
+
+    if(task.takeover && task.failedBotId){
+
+      const failedBot =
+        bots.find(b=>b.id===task.failedBotId) ||
+        {id:task.failedBotId};
+
+      /*
+        A failed task is a temporary takeover:
+        remember the receiving bot's current position so it
+        can return there after completing the recovery task.
+      */
+      bot.originalPosition = bot.currentNode;
+      bot.takeover = true;
+      bot.takeoverTaskName = task.name;
+      bot.takeoverTaskId = task.id;
+      bot.takeoverFailedBotId = task.failedBotId;
+      bot.takeoverDestination = task.destination;
+
+      bot.task = TASK.REASSIGNED;
+      bot.taskName = task.name;
+      bot.taskId = task.id;
+      bot.destination = task.destination;
+      bot.path = path;
+      bot.running = true;
+      bot.status = "moving";
+      bot.note = `Taking over failed Bot ${failedBot.id}'s task. Will return after completion.`;
+
+      log(
+        "sms",
+        `SMS: ${task.name} reassigned from failed Bot ${failedBot.id} to Bot ${bot.id}.`
+      );
+
+    }else{
+
+      bot.task = TASK.ASSIGNED;
+      bot.taskName = task.name;
+      bot.taskId = task.id;
+      bot.destination = task.destination;
+      bot.path = path;
+      bot.running = false;
+      bot.status = "ready";
+      bot.note = `Shortest A* route prepared. Press Play All to start.`;
+
+      log(
+        "info",
+        `<b>${bot.id}</b> accepted <b>${task.id}</b> — shortest feasible A* path: ${Math.round(best.cost)} units.`
+      );
+    }
+
+    drawBotPath(bot,path,true);
+    showGoal(bot,task.destination);
+  }
+
+  // Task assignment prepares the route only.
+  // Movement starts only when the operator presses "Play All".
+
+  renderTaskQueue();
+  renderBotCards();
+  updateFleetStats();
+}
 
 /* ============================================================
    PATH DISPLAY
@@ -1863,7 +2212,7 @@ function failBot(id){
   );
   log(
     "sms",
-    `ALERT: Bot ${bot.id} has FAILED at ${locLabel(bot.currentNode)}. Its location is now a dynamic obstacle for the fleet.`
+    `ALERT: Bot ${bot.id} has FAILED at ${locLabel(bot.currentNode)}. P2P fleet update: ${locLabel(bot.currentNode)} is now a dynamic obstacle.`
   );
 
   /*
@@ -1936,6 +2285,7 @@ function failBot(id){
 
   renderBotCards();
   renderLocations();
+  renderTaskQueue();
   updateFleetStats();
 }
 
@@ -1968,50 +2318,102 @@ function broadcastFailure(failedBot){
    ============================================================ */
 
 function reassignTask(failedTask,failedBot){
-  const available=bots.find(b=>b!==failedBot&&!b.failed&&!b.takeover&&(b.status==="idle"||b.status==="arrived")&&b.task===TASK.UNASSIGNED&&!b.destination&&b.path.length<=1);
-  if(available){ assignTakeoverTask(available,failedTask,failedBot); return; }
-  if(!pendingReassignments.some(t=>t.taskId===failedTask.taskId)){
-    pendingReassignments.push({...failedTask,failedBotId:failedBot.id});
-    log("warn",`Task "${failedTask.taskName}" queued for reassignment because all surviving AMRs are currently working.`);
+
+  if(!failedTask.destination) return;
+
+  /*
+    Failed task returns to the SAME global task queue.
+    It will be assigned to the closest available AMR.
+  */
+  let task = taskQueue.find(
+    t=>t.id===failedTask.taskId
+  );
+
+  if(!task){
+
+    task = {
+      id:failedTask.taskId || `TASK-${String(nextTaskNumber++).padStart(3,"0")}`,
+      name:failedTask.taskName || `Warehouse Task ${nextTaskNumber-1}`,
+      destination:failedTask.destination,
+      status:"queued",
+      assignedBotId:null,
+      failedBotId:failedBot.id,
+      takeover:true,
+      createdAt:Date.now()
+    };
+
+    taskQueue.push(task);
+
+  }else{
+
+    task.status = "queued";
+    task.assignedBotId = null;
+    task.failedBotId = failedBot.id;
+    task.takeover = true;
   }
+
+  log(
+    "warn",
+    `Task <b>${task.id}</b> returned to the queue after Bot ${failedBot.id} failure.`
+  );
+
+  dispatchQueuedTasks();
+  renderTaskQueue();
 }
+
 
 function assignTakeoverTask(bot,failedTask,failedBot){
-  if(bot.failed||bot.takeover||!failedTask.destination)return false;
-  const blocked=getBlockedNodes(bot); blocked.delete(failedTask.destination);
-  const newPath=aStar(bot.currentNode,failedTask.destination,blocked);
-  if(!newPath||newPath.length<2){ log("warn",`Bot ${bot.id} cannot safely reach the failed task destination yet. Task remains queued.`); return false; }
-  bot.originalPosition=bot.currentNode;
-  bot.takeover=true;
-  bot.takeoverTaskName=failedTask.taskName;
-  bot.takeoverTaskId=failedTask.taskId;
-  bot.takeoverFailedBotId=failedBot.id;
-  bot.takeoverDestination=failedTask.destination;
-  bot.taskName=failedTask.taskName;
-  bot.task=TASK.REASSIGNED;
-  bot.taskId=failedTask.taskId;
-  bot.destination=failedTask.destination;
-  bot.path=newPath;
-  bot.running=true;
-  bot.status="moving";
-  bot.waitingFor=null;
-  bot.note=`Taking over failed Bot ${failedBot.id}'s task. Will return to ${locLabel(bot.originalPosition)} after completion.`;
-  drawBotPath(bot,newPath,true); showGoal(bot,failedTask.destination);
-  log("sms",`SMS: Task "${failedTask.taskName}" reassigned from failed Bot ${failedBot.id} to Bot ${bot.id}.`);
-  log("reroute",`<b>Bot ${bot.id}</b> takes over the failed task from Bot ${failedBot.id}. Original position: ${locLabel(bot.originalPosition)}.`);
-  ensureRunning(); renderBotCards(); updateFleetStats(); return true;
+
+  if(bot.failed || bot.takeover || !failedTask.destination){
+    return false;
+  }
+
+  const blocked = getBlockedNodes(bot);
+  blocked.delete(failedTask.destination);
+
+  const newPath = aStar(
+    bot.currentNode,
+    failedTask.destination,
+    blocked
+  );
+
+  if(!newPath || newPath.length<2){
+    return false;
+  }
+
+  bot.originalPosition = bot.currentNode;
+  bot.takeover = true;
+  bot.takeoverTaskName = failedTask.taskName;
+  bot.takeoverTaskId = failedTask.taskId;
+  bot.takeoverFailedBotId = failedBot.id;
+  bot.takeoverDestination = failedTask.destination;
+
+  bot.taskName = failedTask.taskName;
+  bot.task = TASK.REASSIGNED;
+  bot.taskId = failedTask.taskId;
+  bot.destination = failedTask.destination;
+  bot.path = newPath;
+  bot.running = true;
+  bot.status = "moving";
+  bot.waitingFor = null;
+
+  drawBotPath(bot,newPath,true);
+  showGoal(bot,failedTask.destination);
+
+  log(
+    "sms",
+    `SMS: ${failedTask.taskName} reassigned from failed Bot ${failedBot.id} to Bot ${bot.id}.`
+  );
+
+  ensureRunning();
+  return true;
 }
+
 
 function processPendingReassignments(){
-  for(let i=0;i<pendingReassignments.length;i++){
-    const task=pendingReassignments[i];
-    const available=bots.find(b=>!b.failed&&!b.takeover&&(b.status==="idle"||b.status==="arrived")&&b.task===TASK.UNASSIGNED&&!b.destination&&b.path.length<=1);
-    if(!available)break;
-    const failedBot=bots.find(b=>b.id===task.failedBotId)||{id:task.failedBotId};
-    if(assignTakeoverTask(available,task,failedBot)){ pendingReassignments.splice(i,1); i--; }
-  }
-}
 
+  dispatchQueuedTasks();
+}
 /* ============================================================
    RUN CONTROLS
    ============================================================ */
@@ -2083,6 +2485,8 @@ function toggleAll(){
 
   if(anyRunning){
 
+    document.getElementById("playAllBtn").textContent="⏸ Pause All";
+
     commandable.forEach(bot=>{
       if(bot.running){
         bot.running = false;
@@ -2096,6 +2500,9 @@ function toggleAll(){
     );
 
   }else{
+
+    window.demoStartTime = Date.now();
+    document.getElementById("playAllBtn").textContent="▶ Play All";
 
     commandable.forEach(bot=>{
       bot.running = true;
@@ -2129,7 +2536,87 @@ function ensureRunning(){
    SIMULATION / DECENTRALIZED COLLISION NEGOTIATION
    ============================================================ */
 
+function refreshLivePaths(){
+
+  bots.forEach(bot=>{
+
+    if(
+      bot.failed ||
+      !bot.running ||
+      !bot.destination ||
+      !bot.path ||
+      bot.path.length<2
+    ){
+      return;
+    }
+
+    /*
+      Recalculate from the CURRENT node every tick.
+      All other AMR positions are treated as dynamic
+      obstacles for this local planning decision.
+    */
+    const blocked = getBlockedNodes(bot);
+
+    bots.forEach(other=>{
+      if(other!==bot){
+        blocked.add(other.currentNode);
+      }
+    });
+
+    blocked.delete(bot.currentNode);
+    blocked.delete(bot.destination);
+
+    const livePath = aStar(
+      bot.currentNode,
+      bot.destination,
+      blocked
+    );
+
+    if(!livePath || livePath.length<2){
+      return;
+    }
+
+    const currentCost = pathDistance(bot.path);
+    const liveCost = pathDistance(livePath);
+
+    /*
+      If another AMR has moved and the original/direct route
+      is available again, immediately return to the better path.
+      Also switch whenever the live path is meaningfully shorter.
+    */
+    if(
+      livePath[1]!==bot.path[1] ||
+      liveCost < currentCost - 1
+    ){
+
+      const changed =
+        bot.path.length!==livePath.length ||
+        bot.path.some((n,i)=>n!==livePath[i]);
+
+      if(changed){
+
+        bot.path = livePath;
+        bot.status = "moving";
+
+        drawBotPath(
+          bot,
+          livePath,
+          false
+        );
+      }
+    }
+  });
+}
+
+
 function simTick(){
+
+  /*
+    Re-evaluate every active route before collision negotiation.
+    This makes the system truly dynamic: if a bot has moved out
+    of the way, another AMR can come back onto its best A* route.
+  */
+  refreshLivePaths();
 
   /* Retry a blocked return after a takeover task. */
   bots.forEach(bot=>{
@@ -2147,23 +2634,16 @@ function simTick(){
 
   /*
     Every running AMR independently proposes
-    its next node. Priority resolves simultaneous
-    conflicts.
+    its next node. Live A* replanning resolves dynamic conflicts.
   */
 
-  const active = bots
-    .filter(
-      b=>
-        !b.failed &&
-        b.running &&
-        b.path &&
-        b.path.length>1
-    )
-    .sort(
-      (a,b)=>
-        a.effectivePriority-
-        b.effectivePriority
-    );
+  const active = bots.filter(
+    b=>
+      !b.failed &&
+      b.running &&
+      b.path &&
+      b.path.length>1
+  );
 
   const occupied = new Set(
     bots.map(
@@ -2348,9 +2828,6 @@ function simTick(){
 
     bot.waitTicks = 0;
 
-    bot.effectivePriority =
-      bot.priority;
-
     drawBotPath(
       bot,
       bot.path,
@@ -2371,7 +2848,7 @@ function simTick(){
 
 
   /*
-    Priority aging prevents starvation.
+    Live replanning keeps the fleet moving without fixed priority.
   */
   bots.forEach(bot=>{
 
@@ -2380,7 +2857,7 @@ function simTick(){
       bot.status==="waiting"
     ){
 
-      bot.effectivePriority =
+      bot.effectiveAssignment =
         Math.max(
           -10,
           bot.priority -
@@ -2437,17 +2914,64 @@ function completeTask(bot){
   const destination=bot.destination;
 
   if(!bot.takeover){
-    bot.status="arrived"; bot.running=false; bot.task=TASK.COMPLETED;
-    bot.destination=null; bot.path=[bot.currentNode]; bot.pathEl.setAttribute("d",""); hideGoal(bot);
-    log("arrive",`<b>Bot ${bot.id}</b> reached ${locLabel(destination)}.`);
-    log("sms",`SMS: Task completed — "${taskName}" completed successfully by Bot ${bot.id}.`);
-    if(pendingReassignments.length){ bot.status="idle"; bot.task=TASK.UNASSIGNED; bot.taskName="Task Not Assigned"; processPendingReassignments(); }
-    renderBotCards(); updateFleetStats(); return;
+    bot.status="arrived";
+    bot.running=false;
+    bot.task=TASK.COMPLETED;
+
+    const completedTask =
+      taskQueue.find(t=>t.id===bot.taskId);
+
+    if(completedTask){
+      completedTask.status="completed";
+      completedTask.assignedBotId=bot.id;
+    }
+
+    bot.destination=null;
+    bot.path=[bot.currentNode];
+    bot.pathEl.setAttribute("d","");
+    hideGoal(bot);
+
+    log(
+      "arrive",
+      `<b>Bot ${bot.id}</b> reached ${locLabel(destination)}.`
+    );
+
+    log(
+      "sms",
+      `SMS: Task completed — "${taskName}" completed successfully by Bot ${bot.id}.`
+    );
+
+    /*
+      The bot is immediately available for the next queued task.
+      Dispatch calculates the closest A* task from this NEW position.
+    */
+    bot.status="idle";
+    bot.task=TASK.UNASSIGNED;
+    bot.taskName="Task Not Assigned";
+    bot.taskId=null;
+    bot.note="Task complete. Checking queued work from current position.";
+
+    dispatchQueuedTasks();
+
+    renderTaskQueue();
+    renderBotCards();
+    updateFleetStats();
+    return;
   }
 
   const originalPosition=bot.originalPosition;
   log("arrive",`<b>Bot ${bot.id}</b> completed reassigned task "${taskName}" at ${locLabel(destination)}.`);
   log("sms",`SMS: Task completed — "${taskName}" completed by Bot ${bot.id}. Returning to original position.`);
+
+  const takeoverTask =
+    taskQueue.find(t=>t.id===bot.taskId);
+
+  if(takeoverTask){
+    takeoverTask.status="completed";
+    takeoverTask.assignedBotId=bot.id;
+  }
+
+  markFailedTaskCompleted(bot);
 
   if(originalPosition&&originalPosition!==bot.currentNode){
     const blocked=getBlockedNodes(bot); blocked.delete(originalPosition);
@@ -2490,7 +3014,7 @@ function finishTakeoverReturn(bot){
   bot.note=`Available at original position ${locLabel(returnedTo)}.`;
   bot.pathEl.setAttribute("d",""); hideGoal(bot);
   log("sms",`SMS: Bot ${bot.id} returned to its original position ${locLabel(returnedTo)} and is available.`);
-  processPendingReassignments(); renderBotCards(); renderLocations(); updateFleetStats();
+  dispatchQueuedTasks(); renderTaskQueue(); renderBotCards(); renderLocations(); updateFleetStats();
 }
 
 /* ============================================================
@@ -2696,10 +3220,17 @@ function renderBotCards(){
       <div class="bot-grid">
 
         <div class="info-box">
-          <div class="info-label">Priority</div>
+          <div class="info-label">Assignment</div>
           <div class="info-value">
-            ${bot.priority}
-            ${bot.waitTicks ? ` · aged ${bot.effectivePriority.toFixed(1)}` : ""}
+            ${
+              bot.takeover
+                ? "TAKEOVER"
+                : bot.task===TASK.ASSIGNED
+                  ? "AUTO-ASSIGNED"
+                  : bot.task===TASK.COMPLETED
+                    ? "COMPLETED"
+                    : "AVAILABLE"
+            }
           </div>
         </div>
 
@@ -2813,6 +3344,137 @@ function renderBotCards(){
 
 
 /* ============================================================
+   TASK QUEUE
+   ============================================================ */
+
+
+function getBlockedNodes(bot){
+  const blocked = new Set(obstacles);
+
+  bots.forEach(other=>{
+    if(other!==bot && !other.failed){
+      blocked.add(other.currentNode);
+    }
+  });
+
+  blocked.delete(bot.currentNode);
+  if(bot.destination) blocked.delete(bot.destination);
+
+  return blocked;
+}
+
+function addTaskToQueue(destination){
+  createTask(destination);
+}
+
+function updateP2PDisplay(){
+  const el=document.getElementById("p2pState");
+  if(!el) return;
+
+  const states=bots.map(b=>{
+    const next=b.path && b.path.length>1 ? b.path[1] : "—";
+    return `${b.id}:${tagOf[b.currentNode]}→${next==="—"?"—":tagOf[next]}`;
+  });
+
+  el.textContent=states.join("  ·  ");
+}
+
+function updatePerformanceDemo(){
+  /*
+    The dashboard records the actual decentralized elapsed time.
+    The traditional value is a configurable baseline for the
+    SAME scenario. It starts at 128 s for the SIH demo.
+  */
+  const activeTasks=taskQueue.filter(t=>t.status==="completed").length;
+  const decEl=document.getElementById("decentralizedTime");
+  const impEl=document.getElementById("improvementValue");
+
+  if(!decEl || !impEl) return;
+
+  const elapsed = window.demoStartTime
+    ? Math.max(1, Math.round((Date.now()-window.demoStartTime)/1000))
+    : 128;
+
+  /*
+    Don't claim an improvement before a completed scenario.
+    Once tasks finish, show the measured elapsed time.
+  */
+  const measured =
+    activeTasks>0
+      ? elapsed
+      : 128;
+
+  const traditional =
+    Number(document.getElementById("traditionalTime")?.textContent.replace("s","")) || 128;
+
+  const improvement =
+    Math.max(0, ((traditional-measured)/traditional)*100);
+
+  decEl.textContent=`${measured}s`;
+  impEl.textContent=`${improvement.toFixed(0)}%`;
+}
+
+function renderTaskQueue(){
+
+  const queueEl =
+    document.getElementById("taskQueue");
+
+  if(!queueEl) return;
+
+  if(!taskQueue.length){
+
+    queueEl.innerHTML =
+      `<div class="queue-empty">No tasks queued. Click any AprilTag to create a task.</div>`;
+
+    return;
+  }
+
+  queueEl.innerHTML =
+    taskQueue.map(task=>{
+
+      const bot =
+        task.assignedBotId
+          ? bots.find(b=>b.id===task.assignedBotId)
+          : null;
+
+      const statusText =
+        task.status==="assigned"
+          ? `Bot ${task.assignedBotId}`
+          : task.status==="completed"
+            ? "Completed"
+            : task.failedBotId
+              ? `Recovery · Bot ${task.failedBotId}`
+              : "Waiting";
+
+      return `
+        <div class="task-card ${task.status} ${task.takeover?"failed-recovery":""}">
+
+          <div class="task-card-status">
+            ${task.status==="assigned" ? "Assigned" : task.status}
+          </div>
+
+          <div class="task-card-id">${task.id}</div>
+
+          <div class="task-card-name">
+            ${task.name}
+          </div>
+
+          <div class="task-card-meta">
+            Goal: <b>${locLabel(task.destination)}</b><br>
+            ${
+              bot
+                ? `AMR: <b>Bot ${bot.id}</b> · Current: ${locLabel(bot.currentNode)}`
+                : statusText
+            }
+          </div>
+
+        </div>
+      `;
+    }).join("");
+}
+
+
+/* ============================================================
    LIVE LOCATION MONITOR
    ============================================================ */
 
@@ -2894,8 +3556,8 @@ function updateFleetStats(){
     ).length;
 
   const completed =
-    bots.filter(
-      b=>b.task===TASK.COMPLETED
+    taskQueue.filter(
+      t=>t.status==="completed"
     ).length;
 
   const failed =
@@ -2904,29 +3566,15 @@ function updateFleetStats(){
     ).length;
 
   const tasks =
-    bots.filter(
-      b=>
-        b.task===TASK.ASSIGNED ||
-        b.task===TASK.REASSIGNED
+    taskQueue.filter(
+      t=>t.status!=="completed"
     ).length;
 
-  document.getElementById(
-    "activeCount"
-  ).textContent = active;
-
-  document.getElementById(
-    "completedCount"
-  ).textContent = completed;
-
-  document.getElementById(
-    "failedCount"
-  ).textContent = failed;
-
-  document.getElementById(
-    "taskCount"
-  ).textContent = tasks;
+  document.getElementById("activeCount").textContent=active;
+  document.getElementById("completedCount").textContent=completed;
+  document.getElementById("failedCount").textContent=failed;
+  document.getElementById("taskCount").textContent=tasks;
 }
-
 
 /* ============================================================
    BOT RECOVERY
@@ -2951,6 +3599,7 @@ function recoverBot(id){
   bot.status = "idle";
   bot.battery = Math.max(25,bot.battery);
   bot.task = TASK.UNASSIGNED;
+  bot.taskName = "Task Not Assigned";
   bot.taskId = null;
   bot.destination = null;
   bot.path = [bot.currentNode];
