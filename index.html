@@ -937,6 +937,68 @@ input[type=range]{
   white-space:nowrap;
 }
 
+
+/* Charging / docking stations for AMR home positions */
+.charging-station{pointer-events:none}
+.charging-station .dock-body{fill:#121820;stroke:#667384;stroke-width:2}
+.charging-station .dock-pad{fill:none;stroke:#8d99a8;stroke-width:2;stroke-dasharray:5 4}
+.charging-station .dock-rail{stroke:#8d99a8;stroke-width:2;stroke-linecap:round}
+.charging-station .dock-led{fill:#67e8a2;stroke:#10151b;stroke-width:1}
+.charging-station .dock-label{fill:#aab5c3;font-size:10px;font-weight:800;letter-spacing:.8px}
+.charging-station .dock-power{fill:#67e8a2;font-size:8px;font-weight:800}
+
+
+/* Highlighted active charging stations */
+.charging-station .dock-body{
+  fill:#0d2419 !important;
+  stroke:#39ff88 !important;
+  stroke-width:2.5 !important;
+  filter:drop-shadow(0 0 7px rgba(57,255,136,.55));
+}
+.charging-station .dock-pad{
+  stroke:#39ff88 !important;
+  stroke-width:2.5 !important;
+  stroke-dasharray:5 4;
+}
+.charging-station .dock-rail{
+  stroke:#39ff88 !important;
+}
+.charging-station .dock-led{
+  fill:#39ff88 !important;
+  filter:drop-shadow(0 0 5px rgba(57,255,136,.9));
+}
+.charging-station .dock-label{
+  fill:#7dffad !important;
+  font-size:11px !important;
+  font-weight:900 !important;
+}
+.charging-station .dock-power{
+  fill:#39ff88 !important;
+  font-size:9px !important;
+  font-weight:900 !important;
+}
+
+
+/* Final dock proportions: AMR fits inside with visible clearance */
+.charging-station .dock-body{
+  filter:drop-shadow(0 0 8px rgba(57,255,136,.60));
+}
+.charging-station .dock-label{
+  font-size:10px !important;
+}
+.charging-station .dock-power{
+  font-size:8px !important;
+}
+
+
+/* Charging dock is physically shown below the start node */
+.charging-connector{
+  stroke:#39ff88;
+  stroke-width:2.5;
+  stroke-dasharray:4 4;
+  opacity:.9;
+}
+
 </style>
 </head>
 
@@ -1489,6 +1551,64 @@ const conflictLayer = el("g");
 const hitLayer = el("g");
 
 svg.appendChild(pathLayer);
+
+/* ============================================================
+   CHARGING / DOCKING STATIONS
+   ============================================================ */
+
+const chargingLayer = el("g");
+chargingLayer.setAttribute("id","chargingStations");
+svg.insertBefore(chargingLayer, pathLayer);
+
+
+function drawChargingConnector(x,y){
+  chargingLayer.appendChild(el("line",{
+    x1:x,y1:y-30,x2:x,y2:y+28,class:"charging-connector"
+  }));
+}
+
+function drawChargingStation(botId, x, y){
+
+  const g = el("g",{class:"charging-station"});
+
+  g.appendChild(el("rect",{
+    x:-45,y:-34,width:90,height:58,rx:9,class:"dock-body"
+  }));
+
+  g.appendChild(el("rect",{
+    x:-36,y:-27,width:72,height:46,rx:5,class:"dock-pad"
+  }));
+
+  g.appendChild(el("line",{
+    x1:-19,y1:4,x2:19,y2:4,class:"dock-rail"
+  }));
+
+  g.appendChild(el("line",{
+    x1:-12,y1:-9,x2:12,y2:-9,class:"dock-rail"
+  }));
+
+  g.appendChild(el("circle",{
+    cx:28,cy:-21,r:3,class:"dock-led"
+  }));
+
+  const label=el("text",{
+    x:0,y:-41,class:"dock-label","text-anchor":"middle"
+  });
+  label.textContent=`CHARGE ${botId}`;
+  g.appendChild(label);
+
+  const power=el("text",{
+    x:0,y:40,class:"dock-power","text-anchor":"middle"
+  });
+  power.textContent="100% • DOCK";
+  g.appendChild(power);
+
+  g.setAttribute("transform",`translate(${x} ${y})`);
+  chargingLayer.appendChild(g);
+}
+
+
+
 svg.appendChild(goalLayer);
 svg.appendChild(obstacleLayer);
 svg.appendChild(failedLayer);
@@ -1577,6 +1697,14 @@ const BOT_DEFS = [
     start:"S-9"
   }
 ];
+
+/* Draw one docking/charging bay at every AMR starting position. */
+BOT_DEFS.forEach(d=>{
+  const spawnIndex=Number(d.start.split("-")[1]);
+  drawChargingConnector(COLS[spawnIndex],SPAWN_Y);
+  drawChargingStation(d.id,COLS[spawnIndex],SPAWN_Y+68);
+});
+
 
 const TASK = {
   UNASSIGNED:"Task Not Assigned",
