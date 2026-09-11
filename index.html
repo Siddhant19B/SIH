@@ -1727,6 +1727,8 @@ function initBots(){
     takeoverTaskId:null,
     takeoverFailedBotId:null,
     takeoverDestination:null,
+    takeoverPhase:null,
+    takeoverPickupNode:null,
     failedTaskName:null,
     failedTaskId:null,
     failedTaskDestination:null,
@@ -1993,6 +1995,10 @@ function pathDistance(path){
   Repeats after every assignment so multiple idle AMRs
   can receive the closest available tasks.
 */
+function isFleetPlaying(){
+  return bots.some(b=>!b.failed && b.running);
+}
+
 function dispatchQueuedTasks(){
 
   while(true){
@@ -2018,7 +2024,17 @@ function dispatchQueuedTasks(){
         can return there after completing the recovery task.
       */
       bot.originalPosition = bot.currentNode;
+      const pickupPlan = getTakeoverPickupPlan(bot,failedBot);
+      if(!pickupPlan || !pickupPlan.path){
+        task.status="queued";
+        task.assignedBotId=null;
+        break;
+      }
+
+      bot.originalPosition = bot.currentNode;
       bot.takeover = true;
+      bot.takeoverPhase = "pickup";
+      bot.takeoverPickupNode = pickupPlan.pickup;
       bot.takeoverTaskName = task.name;
       bot.takeoverTaskId = task.id;
       bot.takeoverFailedBotId = task.failedBotId;
@@ -2027,11 +2043,13 @@ function dispatchQueuedTasks(){
       bot.task = TASK.REASSIGNED;
       bot.taskName = task.name;
       bot.taskId = task.id;
-      bot.destination = task.destination;
-      bot.path = path;
-      bot.running = true;
-      bot.status = "moving";
-      bot.note = `Taking over failed Bot ${failedBot.id}'s task. Will return after completion.`;
+      bot.destination = pickupPlan.pickup;
+      bot.path = pickupPlan.path;
+      bot.running = isFleetPlaying();
+      bot.status = bot.running ? "moving" : "ready";
+      bot.note = bot.running
+        ? `Going to failed Bot ${failedBot.id} to pick up the parcel, then deliver to ${locLabel(task.destination)}.`
+        : `Pickup route prepared near failed Bot ${failedBot.id}. Press Play All to approach, pick up parcel, then deliver to ${locLabel(task.destination)}.`;
 
       log(
         "sms",
@@ -2045,9 +2063,11 @@ function dispatchQueuedTasks(){
       bot.taskId = task.id;
       bot.destination = task.destination;
       bot.path = path;
-      bot.running = false;
-      bot.status = "ready";
-      bot.note = `Shortest A* route prepared. Press Play All to start.`;
+      bot.running = isFleetPlaying();
+      bot.status = bot.running ? "moving" : "ready";
+      bot.note = bot.running
+        ? `Shortest A* route active. AMR is moving.`
+        : `Shortest A* route prepared. Press Play All to start.`;
 
       log(
         "info",
@@ -2055,8 +2075,13 @@ function dispatchQueuedTasks(){
       );
     }
 
-    drawBotPath(bot,path,true);
-    showGoal(bot,task.destination);
+    if(task.takeover && task.failedBotId){
+      drawBotPath(bot,bot.path,true);
+      showGoal(bot,bot.destination);
+    }else{
+      drawBotPath(bot,path,true);
+      showGoal(bot,task.destination);
+    }
   }
 
   // Task assignment prepares the route only.
@@ -2362,53 +2387,151 @@ function reassignTask(failedTask,failedBot){
 }
 
 
+/* ============================================================
+   TAKEOVER PICKUP FLOW
+   Failed-task recovery is a two-stage mission:
+   1) AMR drives to a node adjacent to the failed AMR and picks up
+      the parcel.
+   2) AMR drives from the pickup point to the original task goal.
+   ============================================================ */
+function getTakeoverPickupPlan(bot,failedBot){
+  if(!failedBot || failedBot.currentNode==null) return null;
+
+  const blockedBase=getBlockedNodes(bot);
+  blockedBase.add(failedBot.currentNode);
+
+  let best=null;
+
+  (adj[failedBot.currentNode]||[]).forEach(edge=>{
+    const pickup=edge.to;
+    if(pickup===bot.currentNode && !blockedBase.has(pickup)){
+      const candidate={path:[bot.currentNode],pickup};
+      if(!best || candidate.path.length<best.path.length) best=candidate;
+      return;
+    }
+    if(blockedBase.has(pickup)) return;
+
+    const path=aStar(bot.currentNode,pickup,blockedBase);
+    if(!path) return;
+
+    const cost=pathDistance(path);
+    if(!best || cost<best.cost){
+      best={path,pickup,cost};
+    }
+  });
+
+  return best;
+}
+
+function startTakeoverDelivery(bot){
+  const finalGoal=bot.takeoverDestination;
+  if(!finalGoal) return false;
+
+  const blocked=getBlockedNodes(bot);
+  blocked.delete(finalGoal);
+
+  const deliveryPath=aStar(bot.currentNode,finalGoal,blocked);
+  if(!deliveryPath) return false;
+
+  bot.takeoverPhase="delivery";
+  bot.destination=finalGoal;
+  bot.path=deliveryPath;
+  bot.running=bot.running; // preserve current Play/Pause state
+  bot.status=bot.running ? "moving" : "ready";
+  bot.waitingFor=null;
+  bot.note=`Parcel picked up from failed Bot ${bot.takeoverFailedBotId}. Delivering to ${locLabel(finalGoal)}.`;
+
+  drawBotPath(bot,deliveryPath,true);
+  showGoal(bot,finalGoal);
+
+  log(
+    "sms",
+    `SMS: Bot ${bot.id} reached failed Bot ${bot.takeoverFailedBotId}'s location, picked up the parcel, and is now heading to ${locLabel(finalGoal)}.`
+  );
+  renderBotCards();
+  return true;
+}
+
+function reachTakeoverPickup(bot){
+  const wasFleetPlaying = isFleetPlaying() || !!window.demoStartTime;
+  bot.running=wasFleetPlaying;
+  bot.status=wasFleetPlaying ? "moving" : "arrived";
+  bot.takeoverPhase="pickup";
+  bot.takeoverPickupNode=bot.currentNode;
+  bot.note=`At pickup point near failed Bot ${bot.takeoverFailedBotId}. Parcel pickup in progress.`;
+
+  log(
+    "arrive",
+    `<b>Bot ${bot.id}</b> reached the pickup point near failed Bot ${bot.takeoverFailedBotId}.`
+  );
+  log(
+    "info",
+    `<b>Bot ${bot.id}</b> picked up the parcel from the failed AMR. Replanning to the original goal with A*.`
+  );
+
+  // The parcel is now on the takeover AMR; continue toward the final goal.
+  startTakeoverDelivery(bot);
+
+  // Keep the takeover AMR moving if the fleet was already playing.
+  if(wasFleetPlaying){
+    bot.running=true;
+    bot.status="moving";
+    ensureRunning();
+  }else{
+    bot.running=false;
+    bot.status="ready";
+  }
+
+  renderBotCards();
+  updateFleetStats();
+}
+
 function assignTakeoverTask(bot,failedTask,failedBot){
 
   if(bot.failed || bot.takeover || !failedTask.destination){
     return false;
   }
 
-  const blocked = getBlockedNodes(bot);
-  blocked.delete(failedTask.destination);
-
-  const newPath = aStar(
-    bot.currentNode,
-    failedTask.destination,
-    blocked
-  );
-
-  if(!newPath || newPath.length<2){
+  const pickupPlan=getTakeoverPickupPlan(bot,failedBot);
+  if(!pickupPlan || !pickupPlan.path){
     return false;
   }
 
-  bot.originalPosition = bot.currentNode;
-  bot.takeover = true;
-  bot.takeoverTaskName = failedTask.taskName;
-  bot.takeoverTaskId = failedTask.taskId;
-  bot.takeoverFailedBotId = failedBot.id;
-  bot.takeoverDestination = failedTask.destination;
+  bot.originalPosition=bot.currentNode;
+  bot.takeover=true;
+  bot.takeoverPhase="pickup";
+  bot.takeoverPickupNode=pickupPlan.pickup;
+  bot.takeoverTaskName=failedTask.taskName;
+  bot.takeoverTaskId=failedTask.taskId;
+  bot.takeoverFailedBotId=failedBot.id;
+  bot.takeoverDestination=failedTask.destination;
 
-  bot.taskName = failedTask.taskName;
-  bot.task = TASK.REASSIGNED;
-  bot.taskId = failedTask.taskId;
-  bot.destination = failedTask.destination;
-  bot.path = newPath;
-  bot.running = true;
-  bot.status = "moving";
-  bot.waitingFor = null;
+  bot.taskName=failedTask.taskName;
+  bot.task=TASK.REASSIGNED;
+  bot.taskId=failedTask.taskId;
+  bot.destination=pickupPlan.pickup;
+  bot.path=pickupPlan.path;
+  bot.running=true;
+  bot.status="moving";
+  bot.waitingFor=null;
+  bot.note=`Going to pickup point near failed Bot ${failedBot.id}, then delivering to ${locLabel(failedTask.destination)}.`;
 
-  drawBotPath(bot,newPath,true);
-  showGoal(bot,failedTask.destination);
+  drawBotPath(bot,pickupPlan.path,true);
+  showGoal(bot,pickupPlan.pickup);
 
   log(
     "sms",
-    `SMS: ${failedTask.taskName} reassigned from failed Bot ${failedBot.id} to Bot ${bot.id}.`
+    `SMS: ${failedTask.taskName} reassigned from failed Bot ${failedBot.id} to Bot ${bot.id}. Bot ${bot.id} will first approach the failed AMR, pick up the parcel, then deliver it to ${locLabel(failedTask.destination)}.`
   );
+
+  // If the takeover AMR is already at the pickup point, perform pickup now.
+  if(pickupPlan.path.length<=1){
+    reachTakeoverPickup(bot);
+  }
 
   ensureRunning();
   return true;
 }
-
 
 function processPendingReassignments(){
 
@@ -2838,7 +2961,9 @@ function simTick(){
       bot.path.length<=1 &&
       bot.destination
     ){
-      if(bot.takeover && bot.destination===bot.originalPosition){
+      if(bot.takeover && bot.takeoverPhase==="pickup"){
+        reachTakeoverPickup(bot);
+      }else if(bot.takeover && bot.destination===bot.originalPosition){
         finishTakeoverReturn(bot);
       }else{
         completeTask(bot);
@@ -3009,7 +3134,7 @@ function markFailedTaskCompleted(bot){
 function finishTakeoverReturn(bot){
   const returnedTo=bot.originalPosition||bot.currentNode;
   bot.running=false; bot.status="idle"; bot.task=TASK.UNASSIGNED; bot.taskName="Task Not Assigned"; bot.taskId=null;
-  bot.destination=null; bot.path=[bot.currentNode]; bot.takeover=false; bot.originalPosition=null;
+  bot.destination=null; bot.path=[bot.currentNode]; bot.takeover=false; bot.originalPosition=null; bot.takeoverPhase=null; bot.takeoverPickupNode=null;
   bot.takeoverTaskName=null; bot.takeoverTaskId=null; bot.takeoverFailedBotId=null; bot.takeoverDestination=null; bot.waitingFor=null;
   bot.note=`Available at original position ${locLabel(returnedTo)}.`;
   bot.pathEl.setAttribute("d",""); hideGoal(bot);
